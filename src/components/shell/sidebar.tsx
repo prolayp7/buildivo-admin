@@ -26,7 +26,7 @@ function SidebarContent({ pathname, onNavigate, collapsed = false }: { pathname:
         {!collapsed && (
           <span className="leading-tight">
             <span className="block text-[13.5px] font-semibold tracking-tight text-white">
-              UK Computer Shop
+              Buildivo
             </span>
             <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-label">
               Administration
@@ -64,7 +64,7 @@ function SidebarContent({ pathname, onNavigate, collapsed = false }: { pathname:
                     <Icon
                       className={cn(
                         "h-[17px] w-[17px] shrink-0",
-                        active ? "text-white" : "text-sidebar-ink group-hover:text-sidebar-ink-hover"
+                        active ? "text-sidebar-ink-active" : "text-sidebar-ink group-hover:text-sidebar-ink-hover"
                       )}
                       strokeWidth={2}
                     />
@@ -116,7 +116,7 @@ function SidebarContent({ pathname, onNavigate, collapsed = false }: { pathname:
               render={
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-active text-[11.5px] font-semibold text-white transition-colors hover:bg-sidebar-hover"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-active text-[11.5px] font-semibold text-sidebar-ink-active transition-colors hover:bg-sidebar-hover hover:text-sidebar-ink-hover"
                 />
               }
             >
@@ -129,11 +129,11 @@ function SidebarContent({ pathname, onNavigate, collapsed = false }: { pathname:
             type="button"
             className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-sidebar-hover"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-active text-[11.5px] font-semibold text-white">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-active text-[11.5px] font-semibold text-sidebar-ink-active">
               AK
             </span>
             <span className="min-w-0 flex-1 leading-tight">
-              <span className="block truncate text-[13px] font-medium text-sidebar-ink-active">
+              <span className="block truncate text-[13px] font-medium text-sidebar-ink-hover">
                 Amara Khan
               </span>
               <span className="block truncate text-[11.5px] text-sidebar-ink">Store Manager</span>

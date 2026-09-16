@@ -9,42 +9,42 @@
   --font-mono: var(--font-geist-mono);
 
   /* Canvas & surfaces */
-  --color-canvas: #f5f5f6;
+  --color-canvas: #f6f5f1;
   --color-surface: #ffffff;
-  --color-sidebar: #17181b;
-  --color-sidebar-hover: #232427;
-  --color-sidebar-active: #e4141c;
+  --color-sidebar: #172433;
+  --color-sidebar-hover: #26394d;
+  --color-sidebar-active: #ff7900;
 
   /* Borders */
-  --color-border: #e4e4e7;
-  --color-border-strong: #cbcbd0;
-  --color-sidebar-border: #2c2d31;
+  --color-border: #dde1e5;
+  --color-border-strong: #c4cbd1;
+  --color-sidebar-border: #34475a;
 
   /* Ink (text) */
-  --color-ink: #18181b;
-  --color-ink-secondary: #4b4b52;
-  --color-ink-muted: #6c6c74;
-  --color-ink-faint: #97979f;
-  --color-sidebar-ink: #c9cdd3;
+  --color-ink: #141b22;
+  --color-ink-secondary: #4c5f73;
+  --color-ink-muted: #66717e;
+  --color-ink-faint: #66717e;
+  --color-sidebar-ink: #b7c0c9;
   --color-sidebar-ink-hover: #ffffff;
-  --color-sidebar-ink-active: #ffffff;
-  --color-sidebar-label: #ff9da1;
+  --color-sidebar-ink-active: #172433;
+  --color-sidebar-label: #ffb574;
 
-  /* RigForge red — navigation, focus and primary emphasis */
-  --color-accent: #e4141c;
-  --color-accent-strong: #a30f14;
+  /* Buildivo orange — deeper shade keeps white labels and links readable. */
+  --color-accent: #b94f00;
+  --color-accent-strong: #963f00;
   --color-accent-ink: #ffffff;
-  --color-accent-tint: #fdeaea;
-  --color-accent-tint-border: #f3bdc0;
-  --color-accent-tint-ink: #a30f14;
+  --color-accent-tint: #fff1e5;
+  --color-accent-tint-border: #ffc89a;
+  --color-accent-tint-ink: #963f00;
 
-  /* RigForge amber — reserved for attention counts and highlights */
-  --color-highlight: #ff8a00;
-  --color-highlight-strong: #d96f00;
-  --color-highlight-ink: #2a1400;
-  --color-highlight-tint: #fff3e5;
-  --color-highlight-tint-border: #ffd19a;
-  --color-highlight-tint-ink: #9a4d00;
+  /* Logo orange — attention counts and highlights. */
+  --color-highlight: #ff7900;
+  --color-highlight-strong: #e96f00;
+  --color-highlight-ink: #172433;
+  --color-highlight-tint: #fff8f2;
+  --color-highlight-tint-border: #ffc89a;
+  --color-highlight-tint-ink: #963f00;
 
   /* Status vocabulary, reused everywhere a state needs a color */
   --color-positive: #00875a;
@@ -57,13 +57,13 @@
   --color-danger-tint-border: #efbdc5;
   --color-danger-tint-ink: #a7192d;
 
-  --color-neutral-tint: #eeeeef;
-  --color-neutral-tint-ink: #4b4b52;
+  --color-neutral-tint: #efeeea;
+  --color-neutral-tint-ink: #4c5f73;
 
   --shadow-card: 0 1px 2px rgb(24 24 27 / 0.06), 0 6px 18px -8px rgb(24 24 27 / 0.12);
   --shadow-panel: 0 18px 48px -18px rgb(23 24 27 / 0.35);
-  --background: #f5f5f6;
-  --foreground: #18181b;
+  --background: #f6f5f1;
+  --foreground: #141b22;
   --card: #ffffff;
   --card-foreground: #101827;
   --popover: #ffffff;
@@ -194,7 +194,7 @@ body {
 
 ::selection {
   background: var(--color-accent-tint-border);
-  color: var(--color-accent-ink);
+  color: var(--color-accent-tint-ink);
 }
 
 * {
@@ -302,7 +302,7 @@ body {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* shadcn/ui semantic tokens mapped to the existing UKShop admin palette. */
+/* shadcn/ui semantic tokens mapped to the Buildivo admin palette. */
 :root {
   --background: var(--color-canvas);
   --foreground: var(--color-ink);

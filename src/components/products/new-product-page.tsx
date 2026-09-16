@@ -9,10 +9,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { ProductImagesEditor, type ProductImagesHandle } from "@/components/products/product-images-editor";
 import { ProductVariantsEditor, type ProductVariantsHandle } from "@/components/products/product-variants-editor";
+import { ProductPriceTiersEditor } from "@/components/products/product-price-tiers-editor";
 import type { CatalogOption, ProductListItem, ProductStatus } from "@/lib/products";
 
 type ProductType = "standard" | "variants";
-type Tab = "description" | "details" | "variants" | "stock" | "shipping" | "seo";
+type Tab = "description" | "details" | "variants" | "stock" | "shipping" | "seo" | "pricing";
 type ProductFeature = { id: string; name: string; value: string };
 type TaxRate = { id: number; title: string; ratePercent: string; isDefault?: boolean };
 type ShippingMethod = { id: number; title: string; carrier: string; estimatedDaysMin: number | null; estimatedDaysMax: number | null; status: string };
@@ -37,6 +38,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "details", label: "Details" },
   { id: "variants", label: "Variants" },
   { id: "stock", label: "Stock & pricing" },
+  { id: "pricing", label: "Bulk pricing" },
   { id: "shipping", label: "Shipping" },
   { id: "seo", label: "SEO" },
 ];
@@ -372,6 +374,7 @@ export function NewProductPage({ productType, productId }: { productType: Produc
 
     <section className="border-t border-border pt-6"><div className="mb-3"><h2 className="inline-flex items-center gap-1 text-sm font-semibold text-ink">Search tags<HelpTooltip label="Search tags">Add concise phrases customers may use in onsite search, such as a chipset, socket, model family or compatibility term. Avoid repeating broad category names.</HelpTooltip></h2><p className="mt-1 text-xs text-ink-muted">Internal catalogue keywords; these are not HTML meta-keywords.</p></div><div className="flex gap-2"><Input value={seoTagInput} onChange={(event) => setSeoTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addSeoTag(); } }} maxLength={60} placeholder="e.g. AM5 compatible" className={`${inputClass} mt-0`} /><button type="button" onClick={addSeoTag} disabled={!seoTagInput.trim()} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-xs font-semibold text-white disabled:opacity-40"><Plus className="h-4 w-4" />Add</button></div>{seoTags.length ? <div className="mt-3 flex flex-wrap gap-2">{seoTags.map((tag) => <span key={tag} className="inline-flex items-center gap-1.5 rounded-md bg-neutral-tint px-2.5 py-1.5 text-xs font-medium text-ink-secondary">{tag}<button type="button" onClick={() => setSeoTags((current) => current.filter((value) => value !== tag))} aria-label={`Remove ${tag}`} className="text-ink-muted hover:text-ink"><X className="h-3.5 w-3.5" /></button></span>)}</div> : null}</section>
   </div> : null}
+  {activeTab === "pricing" ? <div className="p-4 sm:p-5">{productId ? <ProductPriceTiersEditor productId={productId} /> : <div className="flex items-start gap-3 rounded-md bg-neutral-tint p-4 ring-1 ring-inset ring-border"><FileText className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" /><div><p className="text-xs font-semibold text-ink">Save this product before adding bulk pricing</p><p className="mt-1 text-xs leading-5 text-ink-muted">Quantity-break tiers apply to saved combinations. After saving, add tiers from this tab.</p></div></div>}</div> : null}
   </div></section>
 
   {error ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div> : null}<div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur lg:left-64"><div className="flex w-full items-center justify-between gap-3"><Link href="/products" className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3.5 text-[13px] font-semibold text-ink-secondary hover:bg-neutral-tint"><ArrowLeft className="h-4 w-4" />Back to products</Link><div className="flex gap-2"><button type="submit" disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-surface px-4 text-[13px] font-semibold text-ink-secondary hover:bg-neutral-tint disabled:opacity-50"><Save className="h-4 w-4" />{productId ? "Save changes" : "Save draft"}</button><button type="button" disabled={saving} onClick={(event) => void submit(event as unknown as FormEvent, true)} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-[13px] font-semibold text-white hover:bg-[#1d2939] disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Save and publish</button></div></div></div></form>;

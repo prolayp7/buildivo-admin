@@ -27,6 +27,9 @@ import {
   ShieldCheck,
   Home,
   Mail,
+  PackagePlus,
+  FileQuestion,
+  MessageCircleQuestion,
 } from "lucide-react";
 
 export type NavItem = {
@@ -65,6 +68,8 @@ export const navGroups: NavGroup[] = [
       { label: "Abandoned carts", href: "/abandoned-carts", icon: ShoppingBasket },
       { label: "Customers", href: "/customers", icon: Users },
       { label: "Reviews", href: "/reviews", icon: Star, badge: 6, badgeTone: "accent" },
+      { label: "Product Q&A", href: "/product-questions", icon: MessageCircleQuestion },
+      { label: "Quote requests", href: "/quotes", icon: FileQuestion },
       { label: "Payments", href: "/payments", icon: CreditCard },
       { label: "Returns", href: "/payments/returns", icon: RotateCcw },
       { label: "Gift cards", href: "/gift-cards", icon: Gift },
@@ -76,6 +81,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Homepage", href: "/homepage", icon: Home },
       { label: "Discounts", href: "/promotions", icon: BadgePercent },
+      { label: "Bundles", href: "/bundles", icon: PackagePlus },
       { label: "Pages", href: "/cms/pages", icon: FileText },
       { label: "Blog", href: "/blog", icon: Newspaper },
       { label: "Merchandising", href: "/merchandising", icon: Megaphone },

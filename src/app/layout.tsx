@@ -17,8 +17,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "UK Computer Shop · Admin",
-  description: "Back-office admin panel for UK Computer Shop.",
+  title: "Buildivo · Admin",
+  description: "Back-office admin panel for Buildivo.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -27,6 +27,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        {/* Material Symbols is the icon font the storefront renders category/menu
+            icon names with (see Category.icon / MenuItem.icon) - loaded here so
+            the icon picker in the Categories and Menus admin pages can preview
+            them, same font/axes as buildivo's own layout.tsx. */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         {/*
           THESIS: Operational clarity over decoration — a structural dark sidebar and
