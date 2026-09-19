@@ -1,5 +1,6 @@
 "use client";
 
+import { CURRENCY_SYMBOL } from "@/lib/currency";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, LoaderCircle, Plus, Tag, Trash2 } from "lucide-react";
 
@@ -75,18 +76,18 @@ export function ProductPriceTiersEditor({ productId }: { productId: number }) {
         const draft = drafts[variant.id] ?? { minQty: "", unitPrice: "" };
         return (
           <section key={variant.id} className="rounded-lg border border-border p-4">
-            <div className="flex items-center justify-between"><p className="text-xs font-semibold text-ink">{variant.title}</p><p className="text-[11px] text-ink-muted">Regular £{Number(variant.salePrice ?? variant.price).toFixed(2)}</p></div>
+            <div className="flex items-center justify-between"><p className="text-xs font-semibold text-ink">{variant.title}</p><p className="text-[11px] text-ink-muted">Regular {CURRENCY_SYMBOL}{Number(variant.salePrice ?? variant.price).toFixed(2)}</p></div>
             {tiers.length ? (
               <table className="mt-3 w-full text-left"><thead className="text-[10.5px] uppercase tracking-wide text-ink-muted"><tr><th className="py-1.5">Min qty</th><th className="py-1.5">Unit price</th><th className="w-10 py-1.5" /></tr></thead>
                 <tbody className="divide-y divide-border">{tiers.map((tier) => (
-                  <tr key={tier.id}><td className="py-2 text-xs text-ink">{tier.minQty}+</td><td className="py-2 text-xs text-ink">£{Number(tier.unitPrice).toFixed(2)}</td>
+                  <tr key={tier.id}><td className="py-2 text-xs text-ink">{tier.minQty}+</td><td className="py-2 text-xs text-ink">{CURRENCY_SYMBOL}{Number(tier.unitPrice).toFixed(2)}</td>
                     <td className="py-2"><button type="button" onClick={() => void removeTier(variant, tier)} disabled={savingVariantId === variant.id} aria-label="Remove tier" className="flex h-7 w-7 items-center justify-center rounded-md text-danger hover:bg-danger-tint disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button></td></tr>
                 ))}</tbody>
               </table>
             ) : <p className="mt-3 text-xs text-ink-muted">No bulk pricing tiers set for this combination.</p>}
             <div className="mt-3 flex flex-wrap items-end gap-2">
               <label className="text-[11px] font-semibold text-ink-secondary">Min qty<input type="number" min="2" value={draft.minQty} onChange={(event) => setDrafts((current) => ({ ...current, [variant.id]: { ...draft, minQty: event.target.value } }))} className="mt-1 h-8 w-20 rounded-md border border-border-strong px-2 text-xs" /></label>
-              <label className="text-[11px] font-semibold text-ink-secondary">Unit price (£)<input type="number" min="0.01" step="0.01" value={draft.unitPrice} onChange={(event) => setDrafts((current) => ({ ...current, [variant.id]: { ...draft, unitPrice: event.target.value } }))} className="mt-1 h-8 w-28 rounded-md border border-border-strong px-2 text-xs" /></label>
+              <label className="text-[11px] font-semibold text-ink-secondary">Unit price ({CURRENCY_SYMBOL})<input type="number" min="0.01" step="0.01" value={draft.unitPrice} onChange={(event) => setDrafts((current) => ({ ...current, [variant.id]: { ...draft, unitPrice: event.target.value } }))} className="mt-1 h-8 w-28 rounded-md border border-border-strong px-2 text-xs" /></label>
               <button type="button" onClick={() => void addTier(variant)} disabled={savingVariantId === variant.id} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint disabled:opacity-50">{savingVariantId === variant.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}Add tier</button>
             </div>
           </section>

@@ -1,5 +1,6 @@
 "use client";
 
+import { CURRENCY_SYMBOL } from "@/lib/currency";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -78,26 +79,26 @@ export function QuoteDetail({ id }: { id: number }) {
       <section className="mt-4 overflow-hidden rounded-xl border border-border bg-surface shadow-card">
         <div className="border-b border-border p-4"><h2 className="text-[13.5px] font-semibold text-ink">Requested items</h2></div>
         <table className="w-full min-w-[640px] text-left">
-          <thead className="bg-canvas text-[10.5px] uppercase tracking-wide text-ink-muted"><tr><th className="px-4 py-3">Product</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3">List price</th><th className="px-4 py-3">Quoted unit price (£)</th></tr></thead>
+          <thead className="bg-canvas text-[10.5px] uppercase tracking-wide text-ink-muted"><tr><th className="px-4 py-3">Product</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3">List price</th><th className="px-4 py-3">Quoted unit price ({CURRENCY_SYMBOL})</th></tr></thead>
           <tbody className="divide-y divide-border">
             {quote.items.map((item) => (
               <tr key={item.id}>
                 <td className="px-4 py-3"><p className="text-[13px] font-semibold text-ink">{item.productVariant.product.title}</p><p className="mt-0.5 text-[11px] text-ink-muted">{item.productVariant.title}</p></td>
                 <td className="px-4 py-3 text-xs text-ink-muted">{item.quantity}</td>
-                <td className="px-4 py-3 text-xs text-ink-muted">£{Number(item.productVariant.salePrice ?? item.productVariant.price).toFixed(2)}</td>
+                <td className="px-4 py-3 text-xs text-ink-muted">{CURRENCY_SYMBOL}{Number(item.productVariant.salePrice ?? item.productVariant.price).toFixed(2)}</td>
                 <td className="px-4 py-3"><input type="number" min="0" step="0.01" value={itemPrices[item.id] ?? ""} onChange={(event) => setItemPrices((current) => ({ ...current, [item.id]: event.target.value }))} className="h-9 w-32 rounded-md border border-border-strong px-2.5 text-xs" /></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="border-t border-border px-4 py-3 text-right text-[13px] font-semibold text-ink">Items total: £{itemsTotal.toFixed(2)}</p>
+        <p className="border-t border-border px-4 py-3 text-right text-[13px] font-semibold text-ink">Items total: {CURRENCY_SYMBOL}{itemsTotal.toFixed(2)}</p>
       </section>
 
       <section className="mt-4 space-y-5 rounded-xl border border-border bg-surface p-5 shadow-card">
         <h2 className="text-sm font-semibold text-ink">Response</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <label className={label}>Status<select value={status} onChange={(event) => setStatus(event.target.value as QuoteStatus)} className={input}><option value="NEW">New</option><option value="REVIEWING">Reviewing</option><option value="QUOTED">Quoted</option><option value="ACCEPTED">Accepted</option><option value="DECLINED">Declined</option><option value="EXPIRED">Expired</option></select></label>
-          <label className={label}>Quoted total (£)<input type="number" min="0" step="0.01" value={quotedTotal} onChange={(event) => setQuotedTotal(event.target.value)} placeholder={itemsTotal.toFixed(2)} className={input} /></label>
+          <label className={label}>Quoted total ({CURRENCY_SYMBOL})<input type="number" min="0" step="0.01" value={quotedTotal} onChange={(event) => setQuotedTotal(event.target.value)} placeholder={itemsTotal.toFixed(2)} className={input} /></label>
         </div>
         <label className={`${label} block`}>Internal note<textarea value={adminNote} onChange={(event) => setAdminNote(event.target.value)} rows={3} className={`${input} h-auto py-3`} /></label>
       </section>

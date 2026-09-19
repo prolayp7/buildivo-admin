@@ -1,5 +1,6 @@
 "use client";
 
+import { CURRENCY_SYMBOL } from "@/lib/currency";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -123,7 +124,7 @@ export function BundleForm({ id }: { id?: number }) {
                 {product.variants.map((variant) => {
                   const added = items.some((item) => item.productVariantId === variant.id);
                   return <button key={variant.id} type="button" onClick={() => addVariant(product, variant)} disabled={added} className="mt-1 flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs text-ink-secondary hover:bg-neutral-tint disabled:opacity-50">
-                    <span>£{Number(variant.salePrice ?? variant.price).toFixed(2)}{variant.isDefault ? " · default" : ""}</span>
+                    <span>{CURRENCY_SYMBOL}{Number(variant.salePrice ?? variant.price).toFixed(2)}{variant.isDefault ? " · default" : ""}</span>
                     {added ? <Check className="h-3.5 w-3.5 text-positive-tint-ink" /> : <Plus className="h-3.5 w-3.5" />}
                   </button>;
                 })}
@@ -141,7 +142,7 @@ export function BundleForm({ id }: { id?: number }) {
                 {items.map((item) => (
                   <tr key={item.productVariantId}>
                     <td className="px-3 py-3 text-xs font-semibold text-ink">{item.productTitle}</td>
-                    <td className="px-3 py-3 text-xs text-ink-muted">£{item.variantPrice.toFixed(2)}</td>
+                    <td className="px-3 py-3 text-xs text-ink-muted">{CURRENCY_SYMBOL}{item.variantPrice.toFixed(2)}</td>
                     <td className="px-3 py-3"><input type="number" min="1" value={item.quantity} onChange={(event) => setQty(item.productVariantId, Number(event.target.value))} className="h-8 w-16 rounded-md border border-border-strong px-2 text-xs" /></td>
                     <td className="px-3 py-3"><button type="button" onClick={() => removeItem(item.productVariantId)} aria-label="Remove item" className="flex h-7 w-7 items-center justify-center rounded-md text-danger hover:bg-danger-tint"><Trash2 className="h-3.5 w-3.5" /></button></td>
                   </tr>
@@ -152,10 +153,10 @@ export function BundleForm({ id }: { id?: number }) {
         ) : <p className="mt-4 rounded-md border border-dashed border-border-strong p-5 text-center text-xs text-ink-muted">Search above and add at least one product.</p>}
 
         <div className="mt-4 grid gap-4 border-t border-border pt-4 md:grid-cols-2">
-          <p className="text-xs text-ink-muted">Regular total: <span className="font-semibold text-ink">£{regularTotal.toFixed(2)}</span></p>
-          <label className={label}>Bundle price (£)<input type="number" min="0.01" step="0.01" value={bundlePrice} onChange={(event) => setBundlePrice(event.target.value)} className={input} /></label>
+          <p className="text-xs text-ink-muted">Regular total: <span className="font-semibold text-ink">{CURRENCY_SYMBOL}{regularTotal.toFixed(2)}</span></p>
+          <label className={label}>Bundle price ({CURRENCY_SYMBOL})<input type="number" min="0.01" step="0.01" value={bundlePrice} onChange={(event) => setBundlePrice(event.target.value)} className={input} /></label>
         </div>
-        {bundlePrice && regularTotal > 0 ? <p className="mt-2 text-xs text-positive-tint-ink">Customer saves £{Math.max(0, regularTotal - Number(bundlePrice)).toFixed(2)} vs. buying separately.</p> : null}
+        {bundlePrice && regularTotal > 0 ? <p className="mt-2 text-xs text-positive-tint-ink">Customer saves {CURRENCY_SYMBOL}{Math.max(0, regularTotal - Number(bundlePrice)).toFixed(2)} vs. buying separately.</p> : null}
       </section>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 flex justify-between border-t border-border bg-surface/95 px-4 py-3 lg:left-64">

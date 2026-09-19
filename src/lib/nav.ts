@@ -30,6 +30,7 @@ import {
   PackagePlus,
   FileQuestion,
   MessageCircleQuestion,
+  ScrollText,
 } from "lucide-react";
 
 export type NavItem = {
@@ -64,10 +65,10 @@ export const navGroups: NavGroup[] = [
   {
     label: "Sales",
     items: [
-      { label: "Orders", href: "/orders", icon: ShoppingCart, badge: 12, badgeTone: "accent" },
+      { label: "Orders", href: "/orders", icon: ShoppingCart, badgeTone: "accent" },
       { label: "Abandoned carts", href: "/abandoned-carts", icon: ShoppingBasket },
       { label: "Customers", href: "/customers", icon: Users },
-      { label: "Reviews", href: "/reviews", icon: Star, badge: 6, badgeTone: "accent" },
+      { label: "Reviews", href: "/reviews", icon: Star, badgeTone: "accent" },
       { label: "Product Q&A", href: "/product-questions", icon: MessageCircleQuestion },
       { label: "Quote requests", href: "/quotes", icon: FileQuestion },
       { label: "Payments", href: "/payments", icon: CreditCard },
@@ -99,6 +100,7 @@ export const navGroups: NavGroup[] = [
     label: "System",
     items: [
       { label: "Admin users", href: "/admin-users", icon: ShieldCheck },
+      { label: "Audit log", href: "/audit-log", icon: ScrollText },
       { label: "Settings", href: "/settings", icon: Settings },
     ],
   },

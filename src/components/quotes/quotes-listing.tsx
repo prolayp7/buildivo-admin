@@ -1,5 +1,6 @@
 "use client";
 
+import { CURRENCY_SYMBOL } from "@/lib/currency";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, FileQuestion, LoaderCircle } from "lucide-react";
@@ -56,7 +57,7 @@ export function QuotesListing() {
               <tr key={quote.id}>
                 <td className="px-4 py-3"><p className="text-[13px] font-semibold text-ink">{quote.contactName}</p><p className="mt-0.5 text-[11px] text-ink-muted">{quote.companyName ? `${quote.companyName} · ` : ""}{quote.email}</p></td>
                 <td className="px-4 py-3 text-xs text-ink-muted">{quote.items.length} line{quote.items.length === 1 ? "" : "s"}</td>
-                <td className="px-4 py-3 text-xs font-semibold text-ink">{quote.quotedTotal ? `£${Number(quote.quotedTotal).toFixed(2)}` : "—"}</td>
+                <td className="px-4 py-3 text-xs font-semibold text-ink">{quote.quotedTotal ? `${CURRENCY_SYMBOL}${Number(quote.quotedTotal).toFixed(2)}` : "—"}</td>
                 <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${statusTone[quote.status]}`}>{quote.status}</span></td>
                 <td className="px-4 py-3 text-xs text-ink-muted">{new Date(quote.createdAt).toLocaleDateString("en-GB")}</td>
                 <td className="px-4 py-3 text-right"><Link href={`/quotes/${quote.id}`} className="text-xs font-semibold text-ink-secondary">Review</Link></td>

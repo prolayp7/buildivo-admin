@@ -1,5 +1,6 @@
 "use client";
 
+import { CURRENCY_SYMBOL } from "@/lib/currency";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, PackagePlus, Plus, Search } from "lucide-react";
@@ -47,7 +48,7 @@ export function BundlesPage() {
               <tr key={bundle.id}>
                 <td className="px-4 py-3"><p className="text-[13px] font-semibold text-ink">{bundle.title}</p><p className="mt-0.5 font-mono text-[10.5px] text-ink-muted">{bundle.slug}</p></td>
                 <td className="px-4 py-3 text-xs text-ink-muted">{bundle.items.length}</td>
-                <td className="px-4 py-3 text-xs font-semibold text-ink">£{Number(bundle.bundlePrice).toFixed(2)}</td>
+                <td className="px-4 py-3 text-xs font-semibold text-ink">{CURRENCY_SYMBOL}{Number(bundle.bundlePrice).toFixed(2)}</td>
                 <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${bundle.status === "ACTIVE" ? "bg-success-tint text-success" : "bg-neutral-tint text-ink-muted"}`}>{bundle.status === "ACTIVE" ? "Enabled" : "Disabled"}</span></td>
                 <td className="px-4 py-3 text-right"><Link href={`/bundles/${bundle.id}/edit`} className="text-xs font-semibold text-ink-secondary">Edit</Link></td>
               </tr>
