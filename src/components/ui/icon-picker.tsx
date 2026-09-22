@@ -25,6 +25,7 @@ export const ICON_OPTIONS = [
   "account_balance_wallet", "request_quote", "description", "campaign", "notifications", "info",
   "warning", "lock", "visibility", "thumb_up", "chat", "support_agent", "headset_mic",
   "schedule", "update", "sync", "refresh", "share", "print", "qr_code",
+  "cached", "price_check", "assignment_return",
 ] as const;
 
 function MaterialIcon({ name, className }: { name: string; className?: string }) {

@@ -4,11 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowDown, ArrowUp, Calculator, ExternalLink, Grid3x3, Handshake, LayoutTemplate, LoaderCircle, Package, RefreshCw, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { collectionFromApi } from "@/lib/api-response";
+import { TradeCtaDialog } from "./trade-cta-dialog";
+import { CalculatorsDialog } from "./calculators-dialog";
+import { EcosystemMatcherDialog } from "./ecosystem-matcher-dialog";
+import { ProjectKitsDialog } from "./project-kits-dialog";
 
 const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? "http://localhost:3002";
 
 type SectionType = "HERO" | "TRUST_STRIP" | "DEPARTMENTS" | "FEATURED_PRODUCTS" | "PROJECT_KITS" | "TRADE_CTA" | "CALCULATORS" | "ECOSYSTEM_MATCHER";
-type Section = { id: number; type: SectionType; label: string; sortOrder: number; isVisible: boolean };
+type Section = { id: number; type: SectionType; label: string; sortOrder: number; isVisible: boolean; config: Record<string, string> };
 
 function apiMessage(payload: unknown, fallback: string) { if (payload && typeof payload === "object" && "message" in payload) { const value = (payload as { message?: unknown }).message; if (typeof value === "string") return value; if (Array.isArray(value) && typeof value[0] === "string") return value[0]; } return fallback; }
 
@@ -21,19 +25,24 @@ const meta: Record<SectionType, { icon: typeof LayoutTemplate; description: stri
   TRUST_STRIP: { icon: ShieldCheck, description: "Delivery, warranty and price-match trust badges." },
   DEPARTMENTS: { icon: Grid3x3, description: "Automatic — top-level category tiles." },
   FEATURED_PRODUCTS: { icon: Sparkles, description: "Automatic — products flagged as featured." },
-  PROJECT_KITS: { icon: Package, description: "Fixed content — turnkey project material bundles." },
-  TRADE_CTA: { icon: Handshake, description: "Fixed content — trade account signup banner." },
-  CALCULATORS: { icon: Calculator, description: "Fixed content — jobsite material calculators." },
-  ECOSYSTEM_MATCHER: { icon: Zap, description: "Fixed content — battery ecosystem matcher tool." },
+  PROJECT_KITS: { icon: Package, description: "Turnkey project material bundles." },
+  TRADE_CTA: { icon: Handshake, description: "Trade account signup banner." },
+  CALCULATORS: { icon: Calculator, description: "Jobsite material calculators." },
+  ECOSYSTEM_MATCHER: { icon: Zap, description: "Battery ecosystem matcher tool." },
 };
 // Where each section's actual content is authored, for the types that have
 // one - this panel only controls order/visibility, never the content itself.
 const contentLink: Partial<Record<SectionType, string>> = { HERO: "/merchandising", TRUST_STRIP: "/merchandising", DEPARTMENTS: "/categories", FEATURED_PRODUCTS: "/products" };
+// Section types with an in-panel content editor (via `config`), rather than a
+// deep-link to another page.
+const configEditableTypes = ["PROJECT_KITS", "TRADE_CTA", "CALCULATORS", "ECOSYSTEM_MATCHER"] as const;
+type ConfigEditableType = (typeof configEditableTypes)[number];
 
 export function HomepageListing() {
   const [items, setItems] = useState<Section[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
+  const [editingSection, setEditingSection] = useState<{ type: ConfigEditableType; section: Section } | null>(null);
 
   const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/homepage-sections", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(apiMessage(payload, "Homepage sections could not be loaded.")); setItems(collectionFromApi<Section>(payload)); setPreviewKey((key) => key + 1); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Homepage sections could not be loaded."); } finally { setLoading(false); } }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
@@ -67,7 +76,7 @@ export function HomepageListing() {
         </div>
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
           <label className="flex items-center gap-2 text-xs font-semibold text-ink-secondary"><span className="relative inline-flex h-5 w-9 shrink-0"><input type="checkbox" checked={section.isVisible} onChange={() => void toggleVisible(section)} className="peer sr-only" /><span className="absolute inset-0 rounded-full bg-border-strong transition-colors peer-checked:bg-positive" /><span className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" /></span>{section.isVisible ? "Visible" : "Hidden"}</label>
-          {link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit content<ExternalLink className="h-3.5 w-3.5" /></Link> : <span className="text-xs text-ink-faint">No settings</span>}
+          {link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit content<ExternalLink className="h-3.5 w-3.5" /></Link> : (configEditableTypes as readonly SectionType[]).includes(section.type) ? <button type="button" onClick={() => setEditingSection({ type: section.type as ConfigEditableType, section })} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit content</button> : <span className="text-xs text-ink-faint">No settings</span>}
         </div>
       </div>;
     })}</div>}</div>
@@ -77,5 +86,9 @@ export function HomepageListing() {
       <iframe key={previewKey} src={STOREFRONT_URL} title="Storefront live preview" className="h-[80vh] w-full border-0 bg-canvas" />
     </div></div>
   </div>
+  {editingSection?.type === "PROJECT_KITS" ? <ProjectKitsDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
+  {editingSection?.type === "TRADE_CTA" ? <TradeCtaDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
+  {editingSection?.type === "CALCULATORS" ? <CalculatorsDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
+  {editingSection?.type === "ECOSYSTEM_MATCHER" ? <EcosystemMatcherDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   </div>;
 }
