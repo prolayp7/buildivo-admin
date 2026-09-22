@@ -177,7 +177,15 @@ function SlideDialog({ slide, onClose, onSaved }: { slide: HeroSlide | null; onC
   <label className="block text-[13px] font-semibold text-ink-secondary">Image ALT text<input value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Describe the photo for screen readers" className={inputClass} /></label>
   <div className="grid grid-cols-2 gap-3"><label className="text-[13px] font-semibold text-ink-secondary">Image focal point<input value={imagePosition} onChange={(event) => setImagePosition(event.target.value)} placeholder="e.g. 68% center" className={inputClass} /></label><label className="text-[13px] font-semibold text-ink-secondary">Image fit<select value={imageFit} onChange={(event) => setImageFit(event.target.value as "cover" | "contain")} className={inputClass}><option value="cover">Cover (full-bleed photography)</option><option value="contain">Contain (isolated product cutout)</option></select></label></div>
   <label className="block text-[13px] font-semibold text-ink-secondary">Eyebrow tag<input value={eyebrow} onChange={(event) => setEyebrow(event.target.value)} placeholder="e.g. Cordless Power for the Jobsite" className={inputClass} /></label>
-  <div className="grid grid-cols-3 gap-3"><label className="text-[13px] font-semibold text-ink-secondary">Heading<input required value={heading} onChange={(event) => setHeading(event.target.value)} placeholder="Built for the" className={inputClass} /></label><label className="text-[13px] font-semibold text-ink-secondary">Highlight (accent word)<input value={highlight} onChange={(event) => setHighlight(event.target.value)} placeholder="Demands" className={inputClass} /></label><label className="text-[13px] font-semibold text-ink-secondary">Ending<input value={ending} onChange={(event) => setEnding(event.target.value)} placeholder="of Real Work." className={inputClass} /></label></div>
+  <div className="grid grid-cols-1 gap-3">
+    <label className="text-[13px] font-semibold text-ink-secondary">Heading<input required value={heading} onChange={(event) => setHeading(event.target.value)} placeholder="Built for the" className={inputClass} /></label>
+  </div>
+  <div className="grid grid-cols-1 gap-3">
+    <label className="text-[13px] font-semibold text-ink-secondary">Highlight (accent word)<input value={highlight} onChange={(event) => setHighlight(event.target.value)} placeholder="Demands" className={inputClass} /></label>
+  </div>
+  <div className="grid grid-cols-1 gap-3">
+    <label className="text-[13px] font-semibold text-ink-secondary">Ending<input value={ending} onChange={(event) => setEnding(event.target.value)} placeholder="of Real Work." className={inputClass} /></label>
+  </div>
   <label className="block text-[13px] font-semibold text-ink-secondary">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className={`${inputClass} h-auto resize-y py-2`} /></label>
   <label className="block text-[13px] font-semibold text-ink-secondary">CTA button label<input value={ctaLabel} onChange={(event) => setCtaLabel(event.target.value)} placeholder="Shop Power Tools" className={inputClass} /></label>
 
@@ -195,7 +203,12 @@ function SlideDialog({ slide, onClose, onSaved }: { slide: HeroSlide | null; onC
     )}
   </div>
 
-  <div className="grid grid-cols-2 gap-3"><label className="text-[13px] font-semibold text-ink-secondary">Overlay badge<input value={overlayBadge} onChange={(event) => setOverlayBadge(event.target.value)} placeholder="e.g. Job Site Spotlight" className={inputClass} /></label><label className="text-[13px] font-semibold text-ink-secondary">Overlay spec line{linkType === "PRODUCT" ? " (optional override)" : ""}<input value={specification} onChange={(event) => setSpecification(event.target.value)} placeholder={linkType === "PRODUCT" ? "Auto-filled from the product if left blank" : "e.g. 12,000 RPM · Kickback Brake"} className={inputClass} /></label></div>
+  <div className="grid grid-cols-1 gap-3">
+    <label className="text-[13px] font-semibold text-ink-secondary">Overlay badge<input value={overlayBadge} onChange={(event) => setOverlayBadge(event.target.value)} placeholder="e.g. Job Site Spotlight" className={inputClass} /></label>
+  </div>
+  <div className="grid grid-cols-1 gap-3">
+    <label className="text-[13px] font-semibold text-ink-secondary">Overlay spec line{linkType === "PRODUCT" ? " (optional override)" : ""}<input value={specification} onChange={(event) => setSpecification(event.target.value)} placeholder={linkType === "PRODUCT" ? "Auto-filled from the product if left blank" : "e.g. 12,000 RPM · Kickback Brake"} className={inputClass} /></label>
+  </div>
   <p className="text-[10.5px] text-ink-muted">The floating product-info card (badge, reference, price) only appears on the storefront when a product is linked.</p>
 
   <label className="block text-[13px] font-semibold text-ink-secondary">Status<select value={status} onChange={(event) => setStatus(event.target.value as Status)} className={inputClass}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label>
