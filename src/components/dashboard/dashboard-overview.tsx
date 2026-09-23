@@ -10,6 +10,7 @@ import { OperationalQueues, type Queue } from "@/components/dashboard/operationa
 import { ActivityFeed, type ActivityItem } from "@/components/dashboard/activity-feed";
 import { CategoryBreakdown, type CategoryCount } from "@/components/dashboard/category-breakdown";
 import { TopProducts, type TopProduct } from "@/components/dashboard/top-products";
+import { DailyOrdersHistory, type DailyPoint } from "@/components/dashboard/daily-orders-history";
 import { useCurrentAdmin } from "@/components/shell/sidebar";
 import { collectionFromApi } from "@/lib/api-response";
 import { CURRENCY } from "@/lib/currency";
@@ -71,6 +72,7 @@ export function DashboardOverview() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [categories, setCategories] = useState<CategoryCount[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [dailyHistory, setDailyHistory] = useState<DailyPoint[]>([]);
 
   const [range, setRange] = useState<ChartRange>("30 d");
   const [chartLoading, setChartLoading] = useState(true);
@@ -79,10 +81,13 @@ export function DashboardOverview() {
   const loadCore = useCallback(async () => {
     setLoading(true);
     try {
+      const dailyFrom = new Date();
+      dailyFrom.setDate(dailyFrom.getDate() - 13);
+      const dailyRange = { dateFrom: `${isoDate(dailyFrom)}T00:00:00.000Z`, dateTo: `${isoDate(new Date())}T23:59:59.999Z` };
       const [
         summaryRes, customersRes, inventoryRes, categoriesRes, productsTotalRes, productsActiveRes, couponsRes,
         ordersRes, reviewsRes, quotesRes, questionsRes,
-        pendingReviews, newQuotes, pendingQuestions, returnsRequested, processing, packed, productReportRes,
+        pendingReviews, newQuotes, pendingQuestions, returnsRequested, processing, packed, productReportRes, dailyHistoryRes,
       ] = await Promise.all([
         fetch("/api/orders/summary", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/customers/summary", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
@@ -102,6 +107,7 @@ export function DashboardOverview() {
         total("/api/orders?status=PROCESSING&perPage=1"),
         total("/api/orders?status=PACKED&perPage=1"),
         fetch("/api/reports/products?sort=best", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+        fetch(`/api/reports/sales?dateFrom=${dailyRange.dateFrom}&dateTo=${dailyRange.dateTo}&groupBy=day`, { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
       ]);
 
       const summaryData = summaryRes?.data ?? summaryRes;
@@ -157,6 +163,17 @@ export function DashboardOverview() {
 
       const productRows: ProductReportRow[] = (productReportRes.data ?? productReportRes).rows ?? [];
       setTopProducts(productRows.slice(0, 5));
+
+      const dailyPoints: DailyPoint[] = (dailyHistoryRes.data ?? dailyHistoryRes).points ?? [];
+      const byPeriod = new Map(dailyPoints.map((p) => [p.period, p]));
+      const filled: DailyPoint[] = [];
+      for (let i = 0; i < 14; i++) {
+        const day = new Date(dailyFrom);
+        day.setDate(day.getDate() + i);
+        const key = isoDate(day);
+        filled.push(byPeriod.get(key) ?? { period: key, revenue: 0, orderCount: 0 });
+      }
+      setDailyHistory(filled);
     } finally {
       setLoading(false);
     }
@@ -240,6 +257,10 @@ export function DashboardOverview() {
             <div className="p-5">
               <OrdersChart range={range} onRangeChange={setRange} points={chartPoints} loading={chartLoading} />
             </div>
+          </Card>
+
+          <Card>
+            <DailyOrdersHistory points={dailyHistory} loading={loading} />
           </Card>
 
           <Card>
