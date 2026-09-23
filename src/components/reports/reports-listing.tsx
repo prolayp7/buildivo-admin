@@ -50,14 +50,14 @@ export function ReportsListing() {
         fetch(`/api/reports/geography?${range}`, { cache: "no-store" }),
       ]);
       const salesPayload = await salesRes.json(); if (!salesRes.ok) throw new Error(apiMessage(salesPayload, "Reports could not be loaded."));
-      setSales(salesPayload.points ?? []);
-      const productsPayload = await productsRes.json().catch(() => ({})); if (productsRes.ok) setProducts(productsPayload.rows ?? []);
-      const customersPayload = await customersRes.json().catch(() => ({})); if (customersRes.ok) setCustomers({ newCustomers: customersPayload.newCustomers ?? 0, returningCustomers: customersPayload.returningCustomers ?? 0, topSpenders: customersPayload.topSpenders ?? [] });
+      setSales((salesPayload.data ?? salesPayload).points ?? []);
+      const productsPayload = await productsRes.json().catch(() => ({})); if (productsRes.ok) setProducts((productsPayload.data ?? productsPayload).rows ?? []);
+      const customersPayload = await customersRes.json().catch(() => ({})); if (customersRes.ok) { const c = customersPayload.data ?? customersPayload; setCustomers({ newCustomers: c.newCustomers ?? 0, returningCustomers: c.returningCustomers ?? 0, topSpenders: c.topSpenders ?? [] }); }
       const inventoryPayload = await inventoryRes.json().catch(() => ([])); if (inventoryRes.ok) setInventory(Array.isArray(inventoryPayload) ? inventoryPayload : (inventoryPayload.data ?? []));
-      const ordersPayload = await ordersRes.json().catch(() => ({})); if (ordersRes.ok) setOrders({ byStatus: ordersPayload.byStatus ?? {}, byPaymentStatus: ordersPayload.byPaymentStatus ?? {} });
-      const cbPayload = await cbRes.json().catch(() => ({})); if (cbRes.ok) setCategoryBrand({ byCategory: cbPayload.byCategory ?? [], byBrand: cbPayload.byBrand ?? [] });
-      const couponsPayload = await couponsRes.json().catch(() => ({})); if (couponsRes.ok) setCoupons(couponsPayload.rows ?? []);
-      const geoPayload = await geoRes.json().catch(() => ({})); if (geoRes.ok) setGeography(geoPayload.rows ?? []);
+      const ordersPayload = await ordersRes.json().catch(() => ({})); if (ordersRes.ok) { const o = ordersPayload.data ?? ordersPayload; setOrders({ byStatus: o.byStatus ?? {}, byPaymentStatus: o.byPaymentStatus ?? {} }); }
+      const cbPayload = await cbRes.json().catch(() => ({})); if (cbRes.ok) { const cb = cbPayload.data ?? cbPayload; setCategoryBrand({ byCategory: cb.byCategory ?? [], byBrand: cb.byBrand ?? [] }); }
+      const couponsPayload = await couponsRes.json().catch(() => ({})); if (couponsRes.ok) setCoupons((couponsPayload.data ?? couponsPayload).rows ?? []);
+      const geoPayload = await geoRes.json().catch(() => ({})); if (geoRes.ok) setGeography((geoPayload.data ?? geoPayload).rows ?? []);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Reports could not be loaded."); } finally { setLoading(false); }
   }, [dateFrom, dateTo, groupBy, productSort]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
