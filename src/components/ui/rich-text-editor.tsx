@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -11,6 +11,8 @@ import CharacterCount from "@tiptap/extension-character-count";
 import { AlignCenter, AlignLeft, AlignRight, Bold, Heading2, Italic, Link2, List, ListOrdered, Quote, Redo2, RemoveFormatting, Strikethrough, UnderlineIcon, Undo2, Unlink } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { EditorContextMenu, type EditorAction } from "@/components/ui/editor-context-menu";
+import { LinkDialog, type LinkInitial, type LinkSubmit } from "@/components/ui/link-dialog";
 
 export type RichTextEditorProps = {
   value: string;
@@ -29,6 +31,8 @@ function ToolbarButton({ label, active, disabled, onClick, children }: { label: 
 }
 
 export function RichTextEditor({ value, onChange, ariaLabel, placeholder = "Start writing…", minHeight = "sm", maxLength, onCharacterCountChange, disabled = false, className }: RichTextEditorProps) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [linkDialog, setLinkDialog] = useState<{ initial: LinkInitial; needsText: boolean } | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     editable: !disabled,
@@ -77,6 +81,7 @@ export function RichTextEditor({ value, onChange, ariaLabel, placeholder = "Star
       orderedList: currentEditor?.isActive("orderedList") ?? false,
       blockquote: currentEditor?.isActive("blockquote") ?? false,
       link: currentEditor?.isActive("link") ?? false,
+      hasSelection: currentEditor ? !currentEditor.state.selection.empty : false,
       alignLeft: currentEditor?.isActive({ textAlign: "left" }) ?? false,
       alignCenter: currentEditor?.isActive({ textAlign: "center" }) ?? false,
       alignRight: currentEditor?.isActive({ textAlign: "right" }) ?? false,
@@ -86,21 +91,88 @@ export function RichTextEditor({ value, onChange, ariaLabel, placeholder = "Star
   });
   const toolbarState = state ?? {
     bold: false, italic: false, underline: false, strike: false, heading: false,
-    bulletList: false, orderedList: false, blockquote: false, link: false,
+    bulletList: false, orderedList: false, blockquote: false, link: false, hasSelection: false,
     alignLeft: false, alignCenter: false, alignRight: false,
     canUndo: false, canRedo: false,
   };
 
-  function setLink() {
+  function openLinkDialog() {
     if (!editor) return;
-    const previousUrl = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("Enter the destination URL", previousUrl ?? "https://");
-    if (url === null) return;
-    if (!url.trim()) { editor.chain().focus().extendMarkRange("link").unsetLink().run(); return; }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
+    const active = editor.isActive("link");
+    const attrs = editor.getAttributes("link");
+    setLinkDialog({
+      initial: active ? { href: attrs.href ?? "", target: attrs.target ?? null, rel: attrs.rel ?? null } : null,
+      needsText: !active && editor.state.selection.empty,
+    });
+  }
+
+  function applyLink(value: LinkSubmit) {
+    if (!editor) return;
+    const rel = [value.newTab ? "noopener noreferrer" : "", value.nofollow ? "nofollow" : ""].filter(Boolean).join(" ") || null;
+    const attrs = { href: value.href, target: value.newTab ? "_blank" : null, rel };
+    const chain = editor.chain().focus();
+    if (editor.isActive("link")) chain.extendMarkRange("link").setLink(attrs).run();
+    else if (!editor.state.selection.empty) chain.setLink(attrs).run();
+    else chain.insertContent({ type: "text", text: value.text, marks: [{ type: "link", attrs }] }).run();
+    setLinkDialog(null);
+  }
+
+  function removeLink() {
+    editor?.chain().focus().extendMarkRange("link").unsetLink().run();
+    setLinkDialog(null);
   }
 
   if (!editor) return <div className={cn("min-h-40 animate-pulse rounded-md border border-border-strong bg-neutral-tint", className)} aria-label={`Loading ${ariaLabel}`} />;
 
-  return <div className={cn("mt-2 overflow-hidden rounded-md border border-border-strong bg-surface focus-within:border-accent-strong focus-within:ring-1 focus-within:ring-accent-strong", className)}><div role="toolbar" aria-label={`${ariaLabel} formatting`} className="flex flex-wrap items-center gap-0.5 border-b border-border bg-canvas px-2 py-1.5"><ToolbarButton label="Undo" disabled={!toolbarState.canUndo || disabled} onClick={() => editor.chain().focus().undo().run()}><Undo2 className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Redo" disabled={!toolbarState.canRedo || disabled} onClick={() => editor.chain().focus().redo().run()}><Redo2 className="h-4 w-4" /></ToolbarButton><span className="mx-1 h-5 w-px bg-border" /><ToolbarButton label="Heading" active={toolbarState.heading} disabled={disabled} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Bold" active={toolbarState.bold} disabled={disabled} onClick={() => editor.chain().focus().toggleBold().run()}><Bold className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Italic" active={toolbarState.italic} disabled={disabled} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Underline" active={toolbarState.underline} disabled={disabled} onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Strikethrough" active={toolbarState.strike} disabled={disabled} onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough className="h-4 w-4" /></ToolbarButton><span className="mx-1 h-5 w-px bg-border" /><ToolbarButton label="Bullet list" active={toolbarState.bulletList} disabled={disabled} onClick={() => editor.chain().focus().toggleBulletList().run()}><List className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Numbered list" active={toolbarState.orderedList} disabled={disabled} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Block quote" active={toolbarState.blockquote} disabled={disabled} onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote className="h-4 w-4" /></ToolbarButton><span className="mx-1 h-5 w-px bg-border" /><ToolbarButton label="Align left" active={toolbarState.alignLeft} disabled={disabled} onClick={() => editor.chain().focus().setTextAlign("left").run()}><AlignLeft className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Align center" active={toolbarState.alignCenter} disabled={disabled} onClick={() => editor.chain().focus().setTextAlign("center").run()}><AlignCenter className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Align right" active={toolbarState.alignRight} disabled={disabled} onClick={() => editor.chain().focus().setTextAlign("right").run()}><AlignRight className="h-4 w-4" /></ToolbarButton><span className="mx-1 h-5 w-px bg-border" /><ToolbarButton label={toolbarState.link ? "Edit link" : "Add link"} active={toolbarState.link} disabled={disabled} onClick={setLink}><Link2 className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Remove link" disabled={!toolbarState.link || disabled} onClick={() => editor.chain().focus().unsetLink().run()}><Unlink className="h-4 w-4" /></ToolbarButton><ToolbarButton label="Clear formatting" disabled={disabled} onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}><RemoveFormatting className="h-4 w-4" /></ToolbarButton></div><EditorContent editor={editor} />{maxLength ? <div className="border-t border-border px-3 py-1.5 text-right text-[10.5px] text-ink-muted" aria-live="polite">{editor.storage.characterCount.characters()} of {maxLength} characters</div> : null}</div>;
+  const run = () => editor.chain().focus();
+  const t = toolbarState;
+  const groups: EditorAction[][] = [
+    [
+      { id: "undo", label: "Undo", icon: Undo2, disabled: !t.canUndo, run: () => run().undo().run() },
+      { id: "redo", label: "Redo", icon: Redo2, disabled: !t.canRedo, run: () => run().redo().run() },
+    ],
+    [
+      { id: "heading", label: "Heading", icon: Heading2, active: t.heading, run: () => run().toggleHeading({ level: 2 }).run() },
+      { id: "bold", label: "Bold", icon: Bold, active: t.bold, run: () => run().toggleBold().run() },
+      { id: "italic", label: "Italic", icon: Italic, active: t.italic, run: () => run().toggleItalic().run() },
+      { id: "underline", label: "Underline", icon: UnderlineIcon, active: t.underline, run: () => run().toggleUnderline().run() },
+      { id: "strike", label: "Strikethrough", icon: Strikethrough, active: t.strike, run: () => run().toggleStrike().run() },
+    ],
+    [
+      { id: "bullet", label: "Bullet list", icon: List, active: t.bulletList, run: () => run().toggleBulletList().run() },
+      { id: "ordered", label: "Numbered list", icon: ListOrdered, active: t.orderedList, run: () => run().toggleOrderedList().run() },
+      { id: "quote", label: "Block quote", icon: Quote, active: t.blockquote, run: () => run().toggleBlockquote().run() },
+    ],
+    [
+      { id: "left", label: "Align left", icon: AlignLeft, active: t.alignLeft, run: () => run().setTextAlign("left").run() },
+      { id: "center", label: "Align center", icon: AlignCenter, active: t.alignCenter, run: () => run().setTextAlign("center").run() },
+      { id: "right", label: "Align right", icon: AlignRight, active: t.alignRight, run: () => run().setTextAlign("right").run() },
+    ],
+    [
+      { id: "link", label: t.link ? "Edit link" : "Add link", icon: Link2, active: t.link, run: openLinkDialog },
+      { id: "unlink", label: "Remove link", icon: Unlink, disabled: !t.link, run: () => run().unsetLink().run() },
+      { id: "clear", label: "Clear formatting", icon: RemoveFormatting, run: () => run().clearNodes().unsetAllMarks().run() },
+    ],
+  ];
+  // In the context menu, linking needs selected text (or an existing link to edit).
+  const menuGroups = groups.map((group) => group.map((action) => (action.id === "link" ? { ...action, disabled: !(t.hasSelection || t.link) } : action)));
+
+  return (
+    <div className={cn("mt-2 overflow-hidden rounded-md border border-border-strong bg-surface focus-within:border-accent-strong focus-within:ring-1 focus-within:ring-accent-strong", className)}>
+      <div role="toolbar" aria-label={`${ariaLabel} formatting`} className="flex flex-wrap items-center gap-0.5 border-b border-border bg-canvas px-2 py-1.5">
+        {groups.map((group, index) => (
+          <Fragment key={index}>
+            {index > 0 ? <span className="mx-1 h-5 w-px bg-border" /> : null}
+            {group.map((action) => { const Icon = action.icon; return <ToolbarButton key={action.id} label={action.label} active={action.active} disabled={disabled || action.disabled} onClick={action.run}><Icon className="h-4 w-4" /></ToolbarButton>; })}
+          </Fragment>
+        ))}
+      </div>
+      <div onContextMenu={(event) => { if (disabled || event.shiftKey) return; event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY }); }}>
+        <EditorContent editor={editor} />
+      </div>
+      {contextMenu ? <EditorContextMenu x={contextMenu.x} y={contextMenu.y} groups={menuGroups} onClose={() => setContextMenu(null)} /> : null}
+      {linkDialog ? <LinkDialog initial={linkDialog.initial} needsText={linkDialog.needsText} onSubmit={applyLink} onRemove={removeLink} onClose={() => setLinkDialog(null)} /> : null}
+      {maxLength ? <div className="border-t border-border px-3 py-1.5 text-right text-[10.5px] text-ink-muted" aria-live="polite">{editor.storage.characterCount.characters()} of {maxLength} characters</div> : null}
+    </div>
+  );
 }

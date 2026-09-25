@@ -77,7 +77,7 @@ export function BundleForm({ id }: { id?: number }) {
     setSaving(true); setError("");
     const body = {
       title, slug, description: description || undefined, bundlePrice: Number(bundlePrice), status,
-      startsAt: startsAt || undefined, endsAt: endsAt || undefined,
+      startsAt: startsAt || null, endsAt: endsAt || null,
       items: items.map((item) => ({ productVariantId: item.productVariantId, quantity: item.quantity })),
     };
     try {

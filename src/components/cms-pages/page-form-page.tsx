@@ -2,45 +2,94 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Check, ChevronRight, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ArrowLeft, Check, ChevronRight, LoaderCircle, Lock, Save } from "lucide-react";
+import { BlogContentBlocks, blocksToHtml, hasContent, newBlock, type ContentBlock } from "@/components/blog/blog-content-blocks";
+import { SeoPanel, ScoreRing } from "@/components/blog/seo-panel";
+import { analyzeSeo } from "@/components/blog/seo-analysis";
+import { pageBlocksFromJson, pageBlocksToJson } from "@/components/cms-pages/page-blocks";
 
-type Block = { heading: string; body: string };
+const SITE_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? "http://localhost:3002";
+const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "").replace(/\/$/, "");
 const inputClass = "mt-2 h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] font-normal text-ink outline-none placeholder:text-ink-faint focus:border-accent-strong";
 const labelClass = "text-[13px] font-semibold text-ink-secondary";
+const cardClass = "rounded-xl border border-border bg-surface p-5 shadow-card";
 function message(payload: unknown, fallback: string) { if (payload && typeof payload === "object" && "message" in payload) { const value = (payload as { message?: unknown }).message; if (typeof value === "string") return value; if (Array.isArray(value) && typeof value[0] === "string") return value[0]; } return fallback; }
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
-
-// contentBlocks is a free-form JSON field - the storefront (ContentPage.tsx)
-// renders a plain string as paragraphs or an array of {heading?, body}
-// sections. This editor always writes the array shape; a string it loads
-// (e.g. from seed data written before this editor existed) is converted to
-// one section on load so it keeps rendering identically either way.
-function normalizeBlocks(raw: unknown): Block[] {
-  if (typeof raw === "string") return raw.trim() ? [{ heading: "", body: raw.split("\n\n").map((paragraph) => `<p>${paragraph}</p>`).join("") }] : [];
-  if (Array.isArray(raw)) return raw.map((block) => { const item = block && typeof block === "object" ? block as { heading?: unknown; body?: unknown } : {}; return { heading: typeof item.heading === "string" ? item.heading : "", body: typeof item.body === "string" ? item.body : "" }; });
-  return [];
-}
 
 export function PageFormPage({ pageId }: { pageId?: number }) {
   const router = useRouter(), editing = Number.isInteger(pageId);
   const [loading, setLoading] = useState(Boolean(editing));
   const [title, setTitle] = useState(""), [slug, setSlug] = useState(""), [status, setStatus] = useState<"DRAFT" | "PUBLISHED">("DRAFT");
-  const [blocks, setBlocks] = useState<Block[]>([{ heading: "", body: "" }]);
-  const [metaTitle, setMetaTitle] = useState(""), [metaDescription, setMetaDescription] = useState("");
+  const [isSystemPage, setIsSystemPage] = useState(false), [editingSlug, setEditingSlug] = useState(false);
+  const [blocks, setBlocks] = useState<ContentBlock[]>(() => [newBlock("text")]);
+  const [metaTitle, setMetaTitle] = useState(""), [metaDescription, setMetaDescription] = useState(""), [keywords, setKeywords] = useState<string[]>([]);
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
-  useEffect(() => { if (!editing) return; const timer = window.setTimeout(async () => { try { const response = await fetch(`/api/cms/pages/${pageId}`); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Page could not be loaded.")); const item = payload.data ?? payload; setTitle(item.title); setSlug(item.slug); setStatus(item.status); setMetaTitle(item.metaTitle ?? ""); setMetaDescription(item.metaDescription ?? ""); const normalized = normalizeBlocks(item.contentBlocks); setBlocks(normalized.length ? normalized : [{ heading: "", body: "" }]); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Page could not be loaded."); } finally { setLoading(false); } }, 0); return () => window.clearTimeout(timer); }, [pageId, editing]);
-  function updateTitle(value: string) { const generated = slugify(title); setTitle(value); if (!slug || slug === generated) setSlug(slugify(value)); }
-  function updateBlock(index: number, patch: Partial<Block>) { setBlocks((current) => current.map((block, i) => i === index ? { ...block, ...patch } : block)); }
-  function addBlock() { setBlocks((current) => [...current, { heading: "", body: "" }]); }
-  function removeBlock(index: number) { setBlocks((current) => current.filter((_, i) => i !== index)); }
-  async function submit(event: FormEvent) { event.preventDefault(); if (!title.trim() || !slug.trim()) { setError("Page title and friendly URL are required."); return; } setSaving(true); setError(""); try { const contentBlocks = blocks.map((block) => ({ heading: block.heading.trim() || undefined, body: block.body })).filter((block) => block.heading || block.body.replace(/<[^>]*>/g, "").trim()); const response = await fetch(editing ? `/api/cms/pages/${pageId}` : "/api/cms/pages", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), slug: slug.trim(), status, contentBlocks, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined }) }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(message(payload, "Page could not be saved.")); router.push("/cms/pages"); router.refresh(); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Page could not be saved."); } finally { setSaving(false); } }
+
+  useEffect(() => { if (!editing) return; const timer = window.setTimeout(async () => { try { const response = await fetch(`/api/cms/pages/${pageId}`); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Page could not be loaded.")); const item = payload.data ?? payload; setTitle(item.title); setSlug(item.slug); setStatus(item.status); setIsSystemPage(Boolean(item.isSystemPage)); setMetaTitle(item.metaTitle ?? ""); setMetaDescription(item.metaDescription ?? ""); setKeywords(typeof item.focusKeyword === "string" ? item.focusKeyword.split(",").map((keyword: string) => keyword.trim()).filter(Boolean) : []); setBlocks(pageBlocksFromJson(item.contentBlocks)); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Page could not be loaded."); } finally { setLoading(false); } }, 0); return () => window.clearTimeout(timer); }, [pageId, editing]);
+
+  const content = useMemo(() => blocksToHtml(blocks), [blocks]);
+  // One analysis per keyword; the first (primary) keyword drives the headline score.
+  const results = useMemo(() => (keywords.length ? keywords : [""]).map((focusKeyword) => analyzeSeo({ title, slug, metaTitle, metaDescription, excerpt: "", focusKeyword, contentHtml: content, siteHost: SITE_HOST })), [title, slug, metaTitle, metaDescription, keywords, content]);
+  const result = results[0];
+
+  function updateTitle(value: string) { const generated = slugify(title); setTitle(value); if (!isSystemPage && (!slug || slug === generated)) setSlug(slugify(value)); }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!title.trim() || !slug.trim()) { setError("Page title and friendly URL are required."); return; }
+    setSaving(true); setError("");
+    try {
+      const response = await fetch(editing ? `/api/cms/pages/${pageId}` : "/api/cms/pages", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), slug: slug.trim(), status, contentBlocks: hasContent(blocks) ? pageBlocksToJson(blocks) : [], metaTitle: metaTitle.trim() || null, metaDescription: metaDescription.trim() || null, focusKeyword: keywords.join(", ") || null }) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(message(payload, "Page could not be saved."));
+      router.push("/cms/pages"); router.refresh();
+    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Page could not be saved."); } finally { setSaving(false); }
+  }
+
   if (loading) return <div className="flex min-h-80 items-center justify-center"><LoaderCircle className="h-6 w-6 animate-spin text-ink-muted" /></div>;
-  return <form onSubmit={(event) => void submit(event)} className="w-full pb-20"><div><nav className="flex items-center gap-1.5 text-xs text-ink-muted"><Link href="/cms/pages" className="hover:text-ink">Pages</Link><ChevronRight className="h-3.5 w-3.5" /><span>{editing ? "Edit page" : "Add page"}</span></nav><h1 className="mt-2 text-[22px] font-semibold text-ink">{editing ? `Edit ${title}` : "Add page"}</h1><p className="mt-1 text-[13.5px] text-ink-muted">Standalone storefront content, built from optional headed sections.</p></div>
-  {error ? <div role="alert" className="mt-4 flex gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
-  <section className="mt-4 space-y-7 rounded-xl border border-border bg-surface p-5 shadow-card"><div className="grid gap-4 md:grid-cols-[1fr_220px]"><label className={labelClass}>Page title<input autoFocus={!editing} value={title} onChange={(event) => updateTitle(event.target.value)} maxLength={255} placeholder="e.g. About us" className={inputClass} /></label><label className={labelClass}>Status<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className={inputClass}><option value="PUBLISHED">Published</option><option value="DRAFT">Draft</option></select></label></div>
-  <section className="border-t border-border pt-6"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold text-ink">Page content</h2><button type="button" onClick={addBlock} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint"><Plus className="h-3.5 w-3.5" />Add section</button></div><div className="mt-4 space-y-5">{blocks.map((block, index) => <div key={index} className="rounded-lg border border-border p-4"><div className="flex items-center gap-3"><input value={block.heading} onChange={(event) => updateBlock(index, { heading: event.target.value })} placeholder="Section heading (optional)" className={`${inputClass} mt-0 flex-1`} />{blocks.length > 1 ? <button type="button" onClick={() => removeBlock(index)} aria-label={`Remove section ${index + 1}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-danger-tint hover:text-danger-tint-ink"><Trash2 className="h-4 w-4" /></button> : null}</div><div className="mt-3"><RichTextEditor value={block.body} onChange={(value) => updateBlock(index, { body: value })} ariaLabel={`Section ${index + 1} content`} placeholder="Write this section's content." minHeight="sm" /></div></div>)}</div></section>
-  <section className="border-t border-border pt-6"><h2 className="text-sm font-semibold text-ink">Search engine optimisation</h2><div className="mt-4 rounded-lg border border-border p-4 shadow-card"><p className="truncate text-xs text-[#202124]">ukcomputershop.co.uk › {slug || "page-url"}</p><p className="mt-1 truncate text-lg text-[#1a0dab]">{metaTitle.trim() || title || "Page title"}</p><p className="mt-1 line-clamp-2 text-[13px] leading-5 text-[#4d5156]">{metaDescription.trim() || "Add a meta description to preview its search result."}</p></div><div className="mt-4 grid gap-4"><label className={labelClass}>Meta title<div className="relative"><input value={metaTitle} onChange={(event) => setMetaTitle(event.target.value)} maxLength={70} placeholder={title || "Page title"} className={`${inputClass} pr-14`} /><span className="absolute bottom-3 right-3 text-[10.5px] text-ink-muted">{metaTitle.length}/70</span></div></label><label className={labelClass}>Meta description<div className="relative"><textarea value={metaDescription} onChange={(event) => setMetaDescription(event.target.value)} maxLength={320} rows={3} className={`${inputClass} h-auto py-3 pb-7`} /><span className="absolute bottom-2.5 right-3 text-[10.5px] text-ink-muted">{metaDescription.length}/320</span></div></label><label className={labelClass}>Friendly URL<div className="mt-2 flex h-10 items-center rounded-md border border-border-strong"><span className="hidden border-r border-border px-3 text-xs text-ink-muted sm:block">/</span><input value={slug} onChange={(event) => setSlug(slugify(event.target.value))} className="min-w-0 flex-1 px-3 font-mono text-xs outline-none" /></div></label></div></section></section>
-  <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur lg:left-64"><div className="flex items-center justify-between"><Link href="/cms/pages" className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3.5 text-[13px] font-semibold text-ink-secondary"><ArrowLeft className="h-4 w-4" />Back to pages</Link><button type="submit" disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : editing ? <Save className="h-4 w-4" /> : <Check className="h-4 w-4" />}{editing ? "Save changes" : "Create page"}</button></div></div></form>;
+  return (
+    <form onSubmit={(event) => void submit(event)} className="w-full pb-20">
+      <nav className="flex items-center gap-1.5 text-xs text-ink-muted"><Link href="/cms/pages" className="hover:text-ink">Pages</Link><ChevronRight className="h-3.5 w-3.5" /><span>{editing ? "Edit page" : "Add page"}</span></nav>
+      <h1 className="mt-2 text-[22px] font-semibold text-ink">{editing ? "Edit page" : "Add page"}</h1>
+      <p className="mt-1 text-[13.5px] text-ink-muted">Standalone storefront content, built from text sections, images and videos.</p>
+      {error ? <div role="alert" className="mt-4 flex gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
+
+      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
+          <section className={cardClass}>
+            <input autoFocus={!editing} value={title} onChange={(event) => updateTitle(event.target.value)} maxLength={255} placeholder="Add page title" aria-label="Page title" className="h-12 w-full rounded-md border border-border-strong bg-surface px-4 text-lg font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-faint focus:border-accent-strong" />
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-ink-muted">
+              <span className="font-semibold text-ink-secondary">Permalink:</span>
+              <span className="break-all">{SITE_URL}/</span>
+              {editingSlug
+                ? <input autoFocus value={slug} onChange={(event) => setSlug(slugify(event.target.value))} onBlur={() => setEditingSlug(false)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); setEditingSlug(false); } }} aria-label="Friendly URL" className="h-7 min-w-40 rounded border border-border-strong px-2 font-mono text-xs text-ink outline-none focus:border-accent-strong" />
+                : <span className="font-mono text-ink">{slug || "page-url"}</span>}
+              {isSystemPage
+                ? <span title="This is a system page. Its URL is used by the storefront and can't be changed." className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[11.5px] font-semibold text-ink-muted"><Lock className="h-3 w-3" />System page</span>
+                : <button type="button" onClick={() => setEditingSlug((value) => !value)} className="rounded border border-border px-2 py-0.5 text-[11.5px] font-semibold text-ink-secondary hover:bg-canvas">{editingSlug ? "Done" : "Edit"}</button>}
+            </div>
+            <div className="mt-5">
+              <BlogContentBlocks blocks={blocks} onChange={setBlocks} sectionHeadings mediaCollection="pages" />
+              <p className="mt-2 text-xs text-ink-muted">{result.wordCount.toLocaleString("en-GB")} words · about {result.readingMinutes} min read</p>
+            </div>
+          </section>
+
+          <SeoPanel pathPrefix="" noun="page" results={results} title={title} excerpt="" slug={slug} siteHost={SITE_HOST} keywords={keywords} setKeywords={setKeywords} metaTitle={metaTitle} setMetaTitle={setMetaTitle} metaDescription={metaDescription} setMetaDescription={setMetaDescription} />
+        </div>
+
+        <aside className="space-y-5 xl:sticky xl:top-5">
+          <section className={cardClass}>
+            <h2 className="text-sm font-semibold text-ink">Publish</h2>
+            <label className={`${labelClass} mt-3 block`}>Status<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className={inputClass}><option value="PUBLISHED">Published</option><option value="DRAFT">Draft</option></select></label>
+            <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4">
+              <div className="flex items-center gap-2.5"><ScoreRing score={result.seoScore} size={44} label="SEO score" /><span className="text-[11.5px] font-semibold leading-tight text-ink-secondary">SEO<br />score</span></div>
+              <div className="flex items-center gap-2.5"><ScoreRing score={result.readabilityScore} size={44} label="Readability score" /><span className="text-[11.5px] font-semibold leading-tight text-ink-secondary">Readability</span></div>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur lg:left-64"><div className="flex items-center justify-between"><Link href="/cms/pages" className="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3.5 text-[13px] font-semibold text-ink-secondary"><ArrowLeft className="h-4 w-4" />Back to pages</Link><button type="submit" disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : editing ? <Save className="h-4 w-4" /> : <Check className="h-4 w-4" />}{editing ? "Save changes" : "Create page"}</button></div></div>
+    </form>
+  );
 }

@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import { ChangeEvent, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Check, ImageIcon, LoaderCircle, Star, Trash2, Upload } from "lucide-react";
+import { Check, ImageIcon, LoaderCircle, Star, Trash2, Upload, VideoIcon } from "lucide-react";
 import { mediaFileUrl, type MediaItem } from "@/lib/media";
 
 type PendingImage = { key: string; file: File; previewUrl: string };
+
+const VIDEO_URL_PATTERN = /\.(mp4|webm)(?:[?#]|$)/i;
 
 export type ProductImagesHandle = {
   save: (productId: number) => Promise<void>;
@@ -22,8 +24,11 @@ function responseMessage(payload: unknown, fallback: string) {
 
 export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?: number }>(function ProductImagesEditor({ productId }, ref) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<MediaItem[]>([]);
   const [pending, setPending] = useState<PendingImage[]>([]);
+  const [videos, setVideos] = useState<MediaItem[]>([]);
+  const [pendingVideos, setPendingVideos] = useState<PendingImage[]>([]);
   const [defaultKey, setDefaultKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(productId));
   const [error, setError] = useState("");
@@ -32,15 +37,18 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
     if (!productId) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ ownerType: "PRODUCT", ownerId: String(productId), type: "IMAGE", page: "1", perPage: "100" });
+      const params = new URLSearchParams({ ownerType: "PRODUCT", ownerId: String(productId), page: "1", perPage: "100" });
       const response = await fetch(`/api/media?${params}`, { cache: "no-store" });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(responseMessage(payload, "Product images could not be loaded."));
-      const loaded = ((payload.data?.items ?? payload.items ?? []) as MediaItem[]).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
-      setImages(loaded);
-      setDefaultKey((current) => current ?? (loaded[0] ? `media-${loaded[0].id}` : null));
+      if (!response.ok) throw new Error(responseMessage(payload, "Product media could not be loaded."));
+      const items = (payload.data?.items ?? payload.items ?? []) as MediaItem[];
+      const loadedImages = items.filter((item) => !VIDEO_URL_PATTERN.test(item.url)).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+      const loadedVideos = items.filter((item) => VIDEO_URL_PATTERN.test(item.url)).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+      setImages(loadedImages);
+      setVideos(loadedVideos);
+      setDefaultKey((current) => current ?? (loadedImages[0] ? `media-${loadedImages[0].id}` : null));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Product images could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Product media could not be loaded.");
     } finally {
       setLoading(false);
     }
@@ -74,6 +82,29 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
     });
   }
 
+  function chooseVideoFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    setError("");
+    const allowedTypes = new Set(["video/mp4", "video/webm"]);
+    const invalid = files.find((file) => !allowedTypes.has(file.type) || file.size > 25 * 1024 * 1024);
+    if (invalid) {
+      setError(`${invalid.name} must be an MP4 or WebM video no larger than 25 MB.`);
+      event.target.value = "";
+      return;
+    }
+    const additions = files.map((file) => ({ key: `pending-${crypto.randomUUID()}`, file, previewUrl: URL.createObjectURL(file) }));
+    setPendingVideos((current) => [...current, ...additions]);
+    event.target.value = "";
+  }
+
+  function removePendingVideo(key: string) {
+    setPendingVideos((current) => {
+      const removed = current.find((item) => item.key === key);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return current.filter((item) => item.key !== key);
+    });
+  }
+
   useImperativeHandle(ref, () => ({
     async save(ownerId: number) {
       const orderedExisting = [...images].sort((a, b) => (`media-${a.id}` === defaultKey ? -1 : `media-${b.id}` === defaultKey ? 1 : a.sortOrder - b.sortOrder));
@@ -96,8 +127,17 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
         const response = await fetch("/api/media", { method: "POST", body });
         if (!response.ok) throw new Error(responseMessage(await response.json().catch(() => ({})), `${image.file.name} could not be uploaded.`));
       }
+      let videoOrder = videos.length;
+      for (const video of pendingVideos) {
+        const body = new FormData();
+        body.set("file", video.file); body.set("ownerType", "PRODUCT"); body.set("ownerId", String(ownerId)); body.set("collection", "products");
+        body.set("altText", video.file.name.replace(/\.[^.]+$/, "").replaceAll("-", " ").replaceAll("_", " "));
+        body.set("sortOrder", String(videoOrder++));
+        const response = await fetch("/api/media", { method: "POST", body });
+        if (!response.ok) throw new Error(responseMessage(await response.json().catch(() => ({})), `${video.file.name} could not be uploaded.`));
+      }
     },
-  }), [defaultKey, images, pending]);
+  }), [defaultKey, images, pending, videos, pendingVideos]);
 
   const total = images.length + pending.length;
   return <div className="space-y-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-sm font-semibold text-ink">Product images</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-ink-muted">Upload multiple product images. The default image is used on product cards, catalogue grids and the main product display.</p></div><button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-ink px-4 text-xs font-semibold text-white hover:bg-sidebar-hover"><Upload className="h-4 w-4" />Choose images</button><input ref={inputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={chooseFiles} className="sr-only" /></div>
@@ -105,5 +145,13 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
     {error ? <p role="alert" className="rounded-md bg-danger-tint px-4 py-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border">{error}</p> : null}
     {loading ? <div className="flex min-h-48 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-accent" /></div> : total ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{images.map((image) => { const key = `media-${image.id}`, selected = key === defaultKey; return <article key={key} className={`overflow-hidden rounded-lg border bg-surface ${selected ? "border-accent-strong ring-2 ring-accent-tint-border" : "border-border"}`}><div className="relative aspect-square bg-neutral-tint"><Image src={mediaFileUrl(image.url)} alt={image.altText || ""} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-contain" />{selected ? <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink px-2 py-1 text-[10.5px] font-semibold text-white"><Star className="h-3 w-3 fill-current" />Default</span> : null}</div><button type="button" onClick={() => setDefaultKey(key)} className="flex w-full items-center justify-center gap-2 border-t border-border px-3 py-2.5 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">{selected ? <Check className="h-4 w-4" /> : <Star className="h-4 w-4" />}{selected ? "Default image" : "Set as default"}</button></article>; })}{pending.map((image) => { const selected = image.key === defaultKey; return <article key={image.key} className={`overflow-hidden rounded-lg border bg-surface ${selected ? "border-accent-strong ring-2 ring-accent-tint-border" : "border-border"}`}><div className="relative aspect-square bg-neutral-tint"><Image src={image.previewUrl} alt={image.file.name} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-contain" />{selected ? <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink px-2 py-1 text-[10.5px] font-semibold text-white"><Star className="h-3 w-3 fill-current" />Default</span> : null}<button type="button" onClick={() => removePending(image.key)} aria-label={`Remove ${image.file.name}`} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface text-danger shadow-card hover:bg-danger-tint"><Trash2 className="h-4 w-4" /></button></div><button type="button" onClick={() => setDefaultKey(image.key)} className="flex w-full items-center justify-center gap-2 border-t border-border px-3 py-2.5 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">{selected ? <Check className="h-4 w-4" /> : <Star className="h-4 w-4" />}{selected ? "Default image" : "Set as default"}</button></article>; })}</div> : <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-56 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-canvas p-8 text-center hover:border-accent-strong hover:bg-accent-tint/40"><span className="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-tint text-ink-muted"><ImageIcon className="h-6 w-6" /></span><span className="mt-4 text-[13.5px] font-semibold text-ink">Add product images</span><span className="mt-1 text-xs text-ink-muted">Choose one or several JPG, PNG or WebP files.</span></button>}
     {pending.length ? <p className="text-xs text-ink-muted">{pending.length} new {pending.length === 1 ? "image" : "images"} will upload when you save the product.</p> : null}
+
+    <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-sm font-semibold text-ink">Product video</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-ink-muted">Optional. Shown alongside the product images on the storefront.</p></div><button type="button" onClick={() => videoInputRef.current?.click()} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-border-strong px-4 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint"><Upload className="h-4 w-4" />Choose video</button><input ref={videoInputRef} type="file" multiple accept="video/mp4,video/webm" onChange={chooseVideoFiles} className="sr-only" /></div>
+    <div className="rounded-md bg-accent-tint px-4 py-3 text-xs leading-5 text-accent-tint-ink ring-1 ring-inset ring-accent-tint-border">MP4 and WebM are supported, up to 25 MB each.</div>
+    {videos.length || pendingVideos.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {videos.map((video) => <article key={`video-${video.id}`} className="overflow-hidden rounded-lg border border-border bg-surface"><video src={mediaFileUrl(video.url)} controls muted className="aspect-video w-full bg-neutral-tint object-contain" /></article>)}
+      {pendingVideos.map((video) => <article key={video.key} className="overflow-hidden rounded-lg border border-border bg-surface"><div className="relative"><video src={video.previewUrl} controls muted className="aspect-video w-full bg-neutral-tint object-contain" /><button type="button" onClick={() => removePendingVideo(video.key)} aria-label={`Remove ${video.file.name}`} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface text-danger shadow-card hover:bg-danger-tint"><Trash2 className="h-4 w-4" /></button></div></article>)}
+    </div> : <button type="button" onClick={() => videoInputRef.current?.click()} className="flex min-h-32 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-canvas p-6 text-center hover:border-accent-strong hover:bg-accent-tint/40"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-tint text-ink-muted"><VideoIcon className="h-5 w-5" /></span><span className="mt-3 text-[13.5px] font-semibold text-ink">Add a product video</span><span className="mt-1 text-xs text-ink-muted">Choose an MP4 or WebM file.</span></button>}
+    {pendingVideos.length ? <p className="text-xs text-ink-muted">{pendingVideos.length} new video{pendingVideos.length === 1 ? "" : "s"} will upload when you save the product.</p> : null}
   </div>;
 });
