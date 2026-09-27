@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  UserPlus,
   LayoutDashboard,
   Package,
   FolderTree,
@@ -89,6 +90,7 @@ export const navGroups: NavGroup[] = [
       { label: "Merchandising", href: "/merchandising", icon: Megaphone },
       { label: "Menus", href: "/menus", icon: MenuIcon },
       { label: "Footer", href: "/footer", icon: PanelBottom },
+      { label: "Account creation page", href: "/register-page", icon: UserPlus },
       { label: "Subscribers", href: "/subscribers", icon: Mail },
       { label: "FAQs & support", href: "/support-content", icon: HelpCircle },
       { label: "Media library", href: "/media", icon: Images },

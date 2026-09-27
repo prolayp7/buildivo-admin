@@ -17,17 +17,17 @@ type FooterConfig = {
   showGateways: boolean; paymentMethods: Method[]; legalLinks: LinkItem[]; social: Social; copyright: string; complianceBadge: string;
 };
 
-const inputClass = "mt-1.5 h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] font-normal text-ink outline-none placeholder:text-ink-faint focus:border-accent-strong";
-const labelClass = "block text-xs font-semibold text-ink-secondary";
+export const inputClass = "mt-1.5 h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] font-normal text-ink outline-none placeholder:text-ink-faint focus:border-accent-strong";
+export const labelClass = "block text-xs font-semibold text-ink-secondary";
 const cardClass = "rounded-xl border border-border bg-surface p-5 shadow-card";
 const message = (payload: unknown, fallback: string) => { if (payload && typeof payload === "object" && "message" in payload) { const value = (payload as { message?: unknown }).message; if (typeof value === "string") return value; if (Array.isArray(value) && typeof value[0] === "string") return value[0]; } return fallback; };
 
-function Section({ title, description, children }: { title: string; description: ReactNode; children: ReactNode }) {
+export function Section({ title, description, children }: { title: string; description: ReactNode; children: ReactNode }) {
   return <section className={cardClass}><h2 className="text-sm font-semibold text-ink">{title}</h2><p className="mt-1 text-xs text-ink-muted">{description}</p><div className="mt-4">{children}</div></section>;
 }
 
 // Ordered list of editable rows with add / move / delete, shared by every repeatable footer section.
-function RowList<T>({ items, onChange, render, blank, addLabel, max, empty }: { items: T[]; onChange: (items: T[]) => void; render: (item: T, update: (patch: Partial<T>) => void, index: number) => ReactNode; blank: T; addLabel: string; max: number; empty: string }) {
+export function RowList<T>({ items, onChange, render, blank, addLabel, max, empty }: { items: T[]; onChange: (items: T[]) => void; render: (item: T, update: (patch: Partial<T>) => void, index: number) => ReactNode; blank: T; addLabel: string; max: number; empty: string }) {
   const move = (index: number, delta: -1 | 1) => { const next = [...items]; [next[index], next[index + delta]] = [next[index + delta], next[index]]; onChange(next); };
   const button = "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-neutral-tint hover:text-ink disabled:pointer-events-none disabled:opacity-30";
   return (

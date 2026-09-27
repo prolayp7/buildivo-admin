@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-type OrderStatus =
+export type OrderStatus =
   | "PENDING"
   | "AWAITING_PAYMENT"
   | "PROCESSING"
@@ -274,7 +274,7 @@ export function OrdersPage() {
   </div>;
 }
 
-function OrderDrawer({ id, onClose, onStatus }: { id: number; onClose: () => void; onStatus: (status: OrderStatus) => void }) {
+export function OrderDrawer({ id, onClose, onStatus }: { id: number; onClose: () => void; onStatus: (status: OrderStatus) => void }) {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
   const reload = async () => { const response = await fetch(`/api/orders/${id}`, { cache: "no-store" }); if (response.ok) setOrder(unwrap<OrderDetail>(await response.json())); };

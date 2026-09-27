@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, Check, ChevronRight, LoaderCircle, Save } from "lucide-react";
+import { GuideFields, emptyGuide, guideFromPost, guideToPayload, type GuideData } from "@/components/blog/guide-fields";
 import { BlogContentBlocks, blocksFromPost, blocksToHtml, hasContent, newBlock, type ContentBlock } from "@/components/blog/blog-content-blocks";
 import { TagInput } from "@/components/ui/tag-input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -29,10 +30,11 @@ export function BlogPostFormPage({ postId }: { postId?: number }) {
   const [blogCategoryId, setBlogCategoryId] = useState(""), [authorId, setAuthorId] = useState(""), [tags, setTags] = useState<string[]>([]);
   const [isFeatured, setIsFeatured] = useState(false), [status, setStatus] = useState<"DRAFT" | "PUBLISHED">("DRAFT");
   const [metaTitle, setMetaTitle] = useState(""), [metaDescription, setMetaDescription] = useState(""), [keywords, setKeywords] = useState<string[]>([]);
+  const [guide, setGuide] = useState<GuideData>(emptyGuide);
   const [editingSlug, setEditingSlug] = useState(false);
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
-  useEffect(() => { const timer = window.setTimeout(async () => { try { const [categoriesResponse, authorsResponse] = await Promise.all([fetch("/api/blog/categories"), fetch("/api/blog/authors")]); setCategories(collectionFromApi<Option>(await categoriesResponse.json())); setAuthors(collectionFromApi<Option>(await authorsResponse.json())); if (editing) { const response = await fetch(`/api/blog/posts/${postId}`); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Post could not be loaded.")); const item = payload.data ?? payload; setTitle(item.title); setSlug(item.slug); setExcerpt(item.excerpt ?? ""); setBlocks(blocksFromPost(item)); setBlogCategoryId(item.blogCategoryId ? String(item.blogCategoryId) : ""); setAuthorId(item.authorId ? String(item.authorId) : ""); setTags(Array.isArray(item.tags) ? item.tags.filter((tag: unknown): tag is string => typeof tag === "string") : []); setIsFeatured(Boolean(item.isFeatured)); setStatus(item.status); setMetaTitle(item.metaTitle ?? ""); setMetaDescription(item.metaDescription ?? ""); setKeywords(typeof item.focusKeyword === "string" ? item.focusKeyword.split(",").map((keyword: string) => keyword.trim()).filter(Boolean) : []); } } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Post could not be loaded."); } finally { setLoading(false); } }, 0); return () => window.clearTimeout(timer); }, [postId, editing]);
+  useEffect(() => { const timer = window.setTimeout(async () => { try { const [categoriesResponse, authorsResponse] = await Promise.all([fetch("/api/blog/categories"), fetch("/api/blog/authors")]); setCategories(collectionFromApi<Option>(await categoriesResponse.json())); setAuthors(collectionFromApi<Option>(await authorsResponse.json())); if (editing) { const response = await fetch(`/api/blog/posts/${postId}`); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Post could not be loaded.")); const item = payload.data ?? payload; setTitle(item.title); setSlug(item.slug); setExcerpt(item.excerpt ?? ""); setBlocks(blocksFromPost(item)); setBlogCategoryId(item.blogCategoryId ? String(item.blogCategoryId) : ""); setAuthorId(item.authorId ? String(item.authorId) : ""); setTags(Array.isArray(item.tags) ? item.tags.filter((tag: unknown): tag is string => typeof tag === "string") : []); setIsFeatured(Boolean(item.isFeatured)); setStatus(item.status); setGuide(guideFromPost(item)); setMetaTitle(item.metaTitle ?? ""); setMetaDescription(item.metaDescription ?? ""); setKeywords(typeof item.focusKeyword === "string" ? item.focusKeyword.split(",").map((keyword: string) => keyword.trim()).filter(Boolean) : []); } } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Post could not be loaded."); } finally { setLoading(false); } }, 0); return () => window.clearTimeout(timer); }, [postId, editing]);
 
   const content = useMemo(() => blocksToHtml(blocks), [blocks]);
   // One analysis per keyword; the first (primary) keyword drives the headline score.
@@ -45,7 +47,7 @@ export function BlogPostFormPage({ postId }: { postId?: number }) {
     if (!title.trim() || !slug.trim() || !hasContent(blocks)) { setError("Title, friendly URL and at least one content block are required."); return; }
     setSaving(true); setError("");
     try {
-      const response = await fetch(editing ? `/api/blog/posts/${postId}` : "/api/blog/posts", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), slug: slug.trim(), excerpt: excerpt.trim() || undefined, content, contentBlocks: blocks, blogCategoryId: blogCategoryId ? Number(blogCategoryId) : undefined, authorId: authorId ? Number(authorId) : undefined, tags, isFeatured, status, metaTitle: metaTitle.trim() || null, metaDescription: metaDescription.trim() || null, focusKeyword: keywords.join(", ") || null }) });
+      const response = await fetch(editing ? `/api/blog/posts/${postId}` : "/api/blog/posts", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), slug: slug.trim(), excerpt: excerpt.trim() || undefined, content, contentBlocks: blocks, blogCategoryId: blogCategoryId ? Number(blogCategoryId) : undefined, authorId: authorId ? Number(authorId) : undefined, tags, isFeatured, status, metaTitle: metaTitle.trim() || null, metaDescription: metaDescription.trim() || null, focusKeyword: keywords.join(", ") || null, ...guideToPayload(guide) }) });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(message(payload, "Post could not be saved."));
       router.push("/blog"); router.refresh();
@@ -81,6 +83,7 @@ export function BlogPostFormPage({ postId }: { postId?: number }) {
             <label className={`${labelClass} mt-5 block`}>Excerpt<textarea value={excerpt} onChange={(event) => setExcerpt(event.target.value)} rows={2} placeholder="Short summary shown on blog listing cards." className={`${inputClass} h-auto resize-y py-3`} /></label>
           </section>
 
+          <GuideFields value={guide} onChange={setGuide} />
           <SeoPanel title={title} excerpt={excerpt} slug={slug} siteHost={SITE_HOST} keywords={keywords} setKeywords={setKeywords} results={results} metaTitle={metaTitle} setMetaTitle={setMetaTitle} metaDescription={metaDescription} setMetaDescription={setMetaDescription} />
         </div>
 
