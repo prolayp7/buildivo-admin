@@ -5,12 +5,19 @@ import { ChangeEvent, forwardRef, useCallback, useEffect, useImperativeHandle, u
 import { Check, ImageIcon, LoaderCircle, Star, Trash2, Upload, VideoIcon } from "lucide-react";
 import { mediaFileUrl, type MediaItem } from "@/lib/media";
 
-type PendingImage = { key: string; file: File; previewUrl: string };
+type PendingImage = { key: string; file: File; previewUrl: string; altText?: string };
+export type ProductImageSEOStatus = {
+  loaded: boolean;
+  imageCount: number;
+  describedImageCount: number;
+  options: { value: string; url: string | null; label: string; preview: string; pendingKey?: string }[];
+  primaryPreview: string | null;
+};
 
 const VIDEO_URL_PATTERN = /\.(mp4|webm)(?:[?#]|$)/i;
 
 export type ProductImagesHandle = {
-  save: (productId: number) => Promise<void>;
+  save: (productId: number) => Promise<{ socialShareImage?: string }>;
 };
 
 function responseMessage(payload: unknown, fallback: string) {
@@ -22,7 +29,7 @@ function responseMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
-export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?: number }>(function ProductImagesEditor({ productId }, ref) {
+export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?: number; socialSharePendingKey?: string | null; onImageSEOStatusChange?: (status: ProductImageSEOStatus) => void }>(function ProductImagesEditor({ productId, socialSharePendingKey, onImageSEOStatusChange }, ref) {
   const inputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<MediaItem[]>([]);
@@ -32,6 +39,7 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
   const [defaultKey, setDefaultKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(productId));
   const [error, setError] = useState("");
+  const originalAltText = useRef(new Map<number, string>());
 
   const loadImages = useCallback(async () => {
     if (!productId) return;
@@ -44,6 +52,7 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
       const items = (payload.data?.items ?? payload.items ?? []) as MediaItem[];
       const loadedImages = items.filter((item) => !VIDEO_URL_PATTERN.test(item.url)).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
       const loadedVideos = items.filter((item) => VIDEO_URL_PATTERN.test(item.url)).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+      originalAltText.current = new Map(loadedImages.map((image) => [image.id, image.altText ?? ""]));
       setImages(loadedImages);
       setVideos(loadedVideos);
       setDefaultKey((current) => current ?? (loadedImages[0] ? `media-${loadedImages[0].id}` : null));
@@ -56,6 +65,20 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
 
   useEffect(() => { void loadImages(); }, [loadImages]);
 
+  useEffect(() => {
+    const primaryImage = images.find((image) => `media-${image.id}` === defaultKey) ?? pending.find((image) => image.key === defaultKey) ?? images[0] ?? pending[0];
+    onImageSEOStatusChange?.({
+      loaded: !loading && !error,
+      imageCount: images.length + pending.length,
+      describedImageCount: images.filter((image) => Boolean(image.altText?.trim())).length + pending.filter((image) => Boolean(image.altText?.trim())).length,
+      options: [
+        ...images.map((image, index) => ({ value: image.url, url: image.url, label: image.altText?.trim() || image.metadata?.originalName || `Product image ${index + 1}`, preview: mediaFileUrl(image.url) })),
+        ...pending.map((image) => ({ value: `pending:${image.key}`, url: null, label: image.altText?.trim() || image.file.name, preview: image.previewUrl, pendingKey: image.key })),
+      ],
+      primaryPreview: primaryImage ? ("previewUrl" in primaryImage ? primaryImage.previewUrl : mediaFileUrl(primaryImage.url)) : null,
+    });
+  }, [defaultKey, error, images, loading, onImageSEOStatusChange, pending]);
+
   function chooseFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     setError("");
@@ -66,7 +89,7 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
       event.target.value = "";
       return;
     }
-    const additions = files.map((file) => ({ key: `pending-${crypto.randomUUID()}`, file, previewUrl: URL.createObjectURL(file) }));
+    const additions = files.map((file) => ({ key: `pending-${crypto.randomUUID()}`, file, previewUrl: URL.createObjectURL(file), altText: file.name.replace(/\.[^.]+$/, "").replaceAll("-", " ").replaceAll("_", " ") }));
     setPending((current) => [...current, ...additions]);
     if (!defaultKey && additions[0]) setDefaultKey(additions[0].key);
     event.target.value = "";
@@ -113,19 +136,29 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
       let order = defaultIsPending ? orderedExisting.length + 1 : 0;
       for (const image of orderedExisting) {
         const sortOrder = `media-${image.id}` === defaultKey ? 0 : order++;
-        if (image.sortOrder !== sortOrder) {
-          const response = await fetch(`/api/media/${image.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sortOrder }) });
-          if (!response.ok) throw new Error(responseMessage(await response.json().catch(() => ({})), "The default image could not be updated."));
+        const updates: { sortOrder?: number; altText?: string } = {};
+        if (image.sortOrder !== sortOrder) updates.sortOrder = sortOrder;
+        if ((image.altText ?? "") !== originalAltText.current.get(image.id)) updates.altText = image.altText ?? "";
+        if (Object.keys(updates).length) {
+          const response = await fetch(`/api/media/${image.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
+          if (!response.ok) throw new Error(responseMessage(await response.json().catch(() => ({})), "Product image details could not be updated."));
         }
       }
       order = defaultIsPending ? 0 : Math.max(order, orderedExisting.length);
+      let socialShareImage: string | undefined;
       for (const image of orderedPending) {
         const body = new FormData();
         body.set("file", image.file); body.set("ownerType", "PRODUCT"); body.set("ownerId", String(ownerId)); body.set("collection", "products");
-        body.set("altText", image.file.name.replace(/\.[^.]+$/, "").replaceAll("-", " ").replaceAll("_", " "));
+        body.set("altText", image.altText ?? "");
         body.set("sortOrder", String(image.key === defaultKey ? 0 : order++));
         const response = await fetch("/api/media", { method: "POST", body });
-        if (!response.ok) throw new Error(responseMessage(await response.json().catch(() => ({})), `${image.file.name} could not be uploaded.`));
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(responseMessage(payload, `${image.file.name} could not be uploaded.`));
+        if (image.key === socialSharePendingKey) {
+          const savedMedia = payload.data ?? payload;
+          if (typeof savedMedia.url !== "string") throw new Error("The selected social image could not be attached.");
+          socialShareImage = savedMedia.url;
+        }
       }
       let videoOrder = videos.length;
       for (const video of pendingVideos) {
@@ -136,14 +169,39 @@ export const ProductImagesEditor = forwardRef<ProductImagesHandle, { productId?:
         const response = await fetch("/api/media", { method: "POST", body });
         if (!response.ok) throw new Error(responseMessage(await response.json().catch(() => ({})), `${video.file.name} could not be uploaded.`));
       }
+      originalAltText.current = new Map(images.map((image) => [image.id, image.altText ?? ""]));
+      return socialShareImage ? { socialShareImage } : {};
     },
-  }), [defaultKey, images, pending, videos, pendingVideos]);
+  }), [defaultKey, images, pending, socialSharePendingKey, videos, pendingVideos]);
 
   const total = images.length + pending.length;
   return <div className="space-y-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-sm font-semibold text-ink">Product images</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-ink-muted">Upload multiple product images. The default image is used on product cards, catalogue grids and the main product display.</p></div><button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-ink px-4 text-xs font-semibold text-white hover:bg-sidebar-hover"><Upload className="h-4 w-4" />Choose images</button><input ref={inputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={chooseFiles} className="sr-only" /></div>
     <div className="rounded-md bg-accent-tint px-4 py-3 text-xs leading-5 text-accent-tint-ink ring-1 ring-inset ring-accent-tint-border">JPG, PNG and WebP are supported, up to 2 MB each.</div>
     {error ? <p role="alert" className="rounded-md bg-danger-tint px-4 py-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border">{error}</p> : null}
-    {loading ? <div className="flex min-h-48 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-accent" /></div> : total ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{images.map((image) => { const key = `media-${image.id}`, selected = key === defaultKey; return <article key={key} className={`overflow-hidden rounded-lg border bg-surface ${selected ? "border-accent-strong ring-2 ring-accent-tint-border" : "border-border"}`}><div className="relative aspect-square bg-neutral-tint"><Image src={mediaFileUrl(image.url)} alt={image.altText || ""} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-contain" />{selected ? <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink px-2 py-1 text-[10.5px] font-semibold text-white"><Star className="h-3 w-3 fill-current" />Default</span> : null}</div><button type="button" onClick={() => setDefaultKey(key)} className="flex w-full items-center justify-center gap-2 border-t border-border px-3 py-2.5 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">{selected ? <Check className="h-4 w-4" /> : <Star className="h-4 w-4" />}{selected ? "Default image" : "Set as default"}</button></article>; })}{pending.map((image) => { const selected = image.key === defaultKey; return <article key={image.key} className={`overflow-hidden rounded-lg border bg-surface ${selected ? "border-accent-strong ring-2 ring-accent-tint-border" : "border-border"}`}><div className="relative aspect-square bg-neutral-tint"><Image src={image.previewUrl} alt={image.file.name} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-contain" />{selected ? <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink px-2 py-1 text-[10.5px] font-semibold text-white"><Star className="h-3 w-3 fill-current" />Default</span> : null}<button type="button" onClick={() => removePending(image.key)} aria-label={`Remove ${image.file.name}`} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface text-danger shadow-card hover:bg-danger-tint"><Trash2 className="h-4 w-4" /></button></div><button type="button" onClick={() => setDefaultKey(image.key)} className="flex w-full items-center justify-center gap-2 border-t border-border px-3 py-2.5 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">{selected ? <Check className="h-4 w-4" /> : <Star className="h-4 w-4" />}{selected ? "Default image" : "Set as default"}</button></article>; })}</div> : <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-56 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-canvas p-8 text-center hover:border-accent-strong hover:bg-accent-tint/40"><span className="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-tint text-ink-muted"><ImageIcon className="h-6 w-6" /></span><span className="mt-4 text-[13.5px] font-semibold text-ink">Add product images</span><span className="mt-1 text-xs text-ink-muted">Choose one or several JPG, PNG or WebP files.</span></button>}
+    {loading ? <div className="flex min-h-48 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-accent" /></div> : total ? (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {images.map((image) => {
+          const key = `media-${image.id}`, selected = key === defaultKey;
+          return <article key={key} className={`overflow-hidden rounded-lg border bg-surface ${selected ? "border-accent-strong ring-2 ring-accent-tint-border" : "border-border"}`}>
+            <div className="relative aspect-square bg-neutral-tint"><Image src={mediaFileUrl(image.url)} alt={image.altText || ""} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-contain" />{selected ? <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink px-2 py-1 text-[10.5px] font-semibold text-white"><Star className="h-3 w-3 fill-current" />Default</span> : null}</div>
+            <div className="space-y-2 p-3">
+              <label className="block text-xs font-semibold text-ink-secondary">Image alt text<input value={image.altText ?? ""} onChange={(event) => setImages((current) => current.map((item) => item.id === image.id ? { ...item, altText: event.target.value } : item))} maxLength={255} placeholder="Describe what is shown" className="mt-1 h-9 w-full rounded-md border border-border-strong px-2.5 text-xs font-normal text-ink outline-none focus:border-accent-strong" /></label>
+              <button type="button" onClick={() => setDefaultKey(key)} className="flex h-9 w-full items-center justify-center gap-2 rounded-md border border-border text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">{selected ? <Check className="h-4 w-4" /> : <Star className="h-4 w-4" />}{selected ? "Default image" : "Set as default"}</button>
+            </div>
+          </article>;
+        })}
+        {pending.map((image) => {
+          const selected = image.key === defaultKey;
+          return <article key={image.key} className={`overflow-hidden rounded-lg border bg-surface ${selected ? "border-accent-strong ring-2 ring-accent-tint-border" : "border-border"}`}>
+            <div className="relative aspect-square bg-neutral-tint"><Image src={image.previewUrl} alt={image.altText ?? ""} fill unoptimized sizes="(max-width: 640px) 50vw, 25vw" className="object-contain" />{selected ? <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-ink px-2 py-1 text-[10.5px] font-semibold text-white"><Star className="h-3 w-3 fill-current" />Default</span> : null}<button type="button" onClick={() => removePending(image.key)} aria-label={`Remove ${image.file.name}`} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface text-danger shadow-card hover:bg-danger-tint"><Trash2 className="h-4 w-4" /></button></div>
+            <div className="space-y-2 p-3">
+              <label className="block text-xs font-semibold text-ink-secondary">Image alt text<input value={image.altText ?? ""} onChange={(event) => setPending((current) => current.map((item) => item.key === image.key ? { ...item, altText: event.target.value } : item))} maxLength={255} placeholder="Describe what is shown" className="mt-1 h-9 w-full rounded-md border border-border-strong px-2.5 text-xs font-normal text-ink outline-none focus:border-accent-strong" /></label>
+              <button type="button" onClick={() => setDefaultKey(image.key)} className="flex h-9 w-full items-center justify-center gap-2 rounded-md border border-border text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">{selected ? <Check className="h-4 w-4" /> : <Star className="h-4 w-4" />}{selected ? "Default image" : "Set as default"}</button>
+            </div>
+          </article>;
+        })}
+      </div>
+    ) : <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-56 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-canvas p-8 text-center hover:border-accent-strong hover:bg-accent-tint/40"><span className="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-tint text-ink-muted"><ImageIcon className="h-6 w-6" /></span><span className="mt-4 text-[13.5px] font-semibold text-ink">Add product images</span><span className="mt-1 text-xs text-ink-muted">Choose one or several JPG, PNG or WebP files.</span></button>}
     {pending.length ? <p className="text-xs text-ink-muted">{pending.length} new {pending.length === 1 ? "image" : "images"} will upload when you save the product.</p> : null}
 
     <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-sm font-semibold text-ink">Product video</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-ink-muted">Optional. Shown alongside the product images on the storefront.</p></div><button type="button" onClick={() => videoInputRef.current?.click()} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-border-strong px-4 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint"><Upload className="h-4 w-4" />Choose video</button><input ref={videoInputRef} type="file" multiple accept="video/mp4,video/webm" onChange={chooseVideoFiles} className="sr-only" /></div>

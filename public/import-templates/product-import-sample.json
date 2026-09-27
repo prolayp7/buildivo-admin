@@ -1,0 +1,15 @@
+[
+  {
+    "categoryId": 1,
+    "title": "Sample Workshop Shelf",
+    "slug": "sample-workshop-shelf",
+    "sku": "SAMPLE-SHELF-001",
+    "shortDescription": "Replace this sample description with your product details.",
+    "status": "DRAFT",
+    "initialVariant": {
+      "price": 79.99,
+      "stockQty": 10,
+      "lowStockThreshold": 2
+    }
+  }
+]

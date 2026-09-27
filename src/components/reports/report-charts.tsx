@@ -35,9 +35,9 @@ export function SalesChart({ points, groupBy }: { points: { period: string; reve
           <XAxis dataKey="label" tickLine={false} axisLine={false} tick={tick} minTickGap={18} />
           <YAxis yAxisId="rev" tickLine={false} axisLine={false} width={54} tick={tick} tickFormatter={compactMoney} />
           <YAxis yAxisId="ord" orientation="right" tickLine={false} axisLine={false} width={30} tick={tick} allowDecimals={false} />
-          <Tooltip {...tooltipProps} formatter={(value, name) => (name === "Revenue" ? money(Number(value)) : value)} />
+          <Tooltip {...tooltipProps} formatter={(value, name) => (name === "Net revenue" ? money(Number(value)) : value)} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--color-ink-secondary)" }} />
-          <Bar yAxisId="rev" dataKey="revenue" name="Revenue" fill="var(--color-accent)" radius={[4, 4, 0, 0]} maxBarSize={30} />
+          <Bar yAxisId="rev" dataKey="revenue" name="Net revenue" fill="var(--color-accent)" radius={[4, 4, 0, 0]} maxBarSize={30} />
           <Line yAxisId="ord" dataKey="orderCount" name="Orders" type="monotone" stroke="var(--color-ink)" strokeWidth={2} dot={{ r: 2.5, fill: "var(--color-ink)" }} activeDot={{ r: 4 }} />
         </ComposedChart>
       </ResponsiveContainer>
