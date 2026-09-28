@@ -2,40 +2,51 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Building2, LoaderCircle, MoreHorizontal, PackageCheck, Pencil, Plus, Search, Tag } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, Building2, ChevronLeft, ChevronRight, LoaderCircle, MoreHorizontal, PackageCheck, Pencil, Plus, Search, Tag } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { mediaFileUrl } from "@/lib/media";
 
+type Meta = { page: number; perPage: number; total: number; totalPages: number; summary?: { total: number; enabled: number; productsAssigned: number } };
+const PER_PAGE_OPTIONS = [20, 50, 100] as const;
+const fieldClass = "h-9 rounded-md border border-border-strong bg-surface px-2.5 text-xs text-ink outline-none focus:border-accent-strong";
 type Item = { id: number; title: string; slug: string; status: "ACTIVE" | "INACTIVE"; _count: { products: number }; city?: string | null; countryCode?: string; logo?: string | null; logoAlt?: string | null };
 
 export function BrandsSuppliersPage() {
 	const params = useSearchParams();
 	const tab = params.get("tab") === "suppliers" ? "suppliers" : "brands";
-	const [brands, setBrands] = useState<Item[]>([]);
-	const [suppliers, setSuppliers] = useState<Item[]>([]);
+	const [items, setItems] = useState<Item[]>([]);
+	const [meta, setMeta] = useState<Meta | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState("");
 	const [q, setQ] = useState("");
+	const [search, setSearch] = useState(""); // debounced copy of q
+	const [status, setStatus] = useState("");
+	const [page, setPage] = useState(1);
+	const [perPage, setPerPage] = useState<number>(20);
 
-	useEffect(() => {
-		const timer = window.setTimeout(async () => {
-			setLoading(true);
-			const [brandResponse, supplierResponse] = await Promise.all([
-				fetch("/api/catalog/brands"),
-				fetch("/api/catalog/suppliers"),
-			]);
-			const [brandPayload, supplierPayload] = await Promise.all([brandResponse.json(), supplierResponse.json()]);
-			const brandRows = Array.isArray(brandPayload) ? brandPayload : Array.isArray(brandPayload.data) ? brandPayload.data : brandPayload.data?.items ?? brandPayload.items ?? [];
-			const supplierRows = Array.isArray(supplierPayload) ? supplierPayload : Array.isArray(supplierPayload.data) ? supplierPayload.data : supplierPayload.data?.items ?? supplierPayload.items ?? [];
-			setBrands(brandRows);
-			setSuppliers(supplierRows);
-			setLoading(false);
-		}, 0);
-		return () => clearTimeout(timer);
-	}, []);
+	// Switching tab starts that list from scratch.
+	useEffect(() => { const timer = window.setTimeout(() => { setQ(""); setSearch(""); setStatus(""); setPage(1); }, 0); return () => clearTimeout(timer); }, [tab]);
+	useEffect(() => { const timer = window.setTimeout(() => { setSearch(q.trim()); setPage(1); }, 300); return () => clearTimeout(timer); }, [q]);
 
-	const items = tab === "brands" ? brands : suppliers;
-	const shown = useMemo(() => items.filter((item) => !q || `${item.title} ${item.slug} ${item.city ?? ""}`.toLowerCase().includes(q.toLowerCase())), [items, q]);
+	const load = useCallback(async () => {
+		setLoading(true); setError("");
+		const query = new URLSearchParams({ page: String(page), perPage: String(perPage) });
+		if (search) query.set("q", search);
+		if (status) query.set("status", status);
+		try {
+			const response = await fetch(`/api/catalog/${tab}?${query}`, { cache: "no-store" });
+			const payload = await response.json().catch(() => ({}));
+			if (!response.ok) throw new Error(typeof payload.message === "string" ? payload.message : `The ${tab} could not be loaded.`);
+			setItems(payload.data ?? []); setMeta(payload.meta ?? null);
+		} catch (loadError) { setError(loadError instanceof Error ? loadError.message : `The ${tab} could not be loaded.`); } finally { setLoading(false); }
+	}, [tab, page, perPage, search, status]);
+	useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
+
+	const summary = meta?.summary;
+	const from = meta && meta.total ? (meta.page - 1) * meta.perPage + 1 : 0;
+	const to = meta ? Math.min(meta.page * meta.perPage, meta.total) : 0;
+	const pageButton = "flex h-8 w-8 items-center justify-center rounded-md border border-border text-ink-secondary hover:bg-neutral-tint disabled:opacity-40";
 
 	async function toggle(item: Item) {
 		const next = item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
@@ -45,8 +56,7 @@ export function BrandsSuppliersPage() {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ status: next }),
 		});
-		if (tab === "brands") setBrands((current) => current.map((row) => row.id === item.id ? { ...row, status: next } : row));
-		else setSuppliers((current) => current.map((row) => row.id === item.id ? { ...row, status: next } : row));
+		await load();
 	}
 
 	return (
@@ -66,17 +76,21 @@ export function BrandsSuppliersPage() {
 				<Link href="/brands?tab=suppliers" className={`px-4 py-3 text-xs font-semibold ${tab === "suppliers" ? "border-b-2 border-ink text-ink" : "text-ink-muted"}`}>Suppliers</Link>
 			</div>
 			<div className="mt-4 grid gap-3 sm:grid-cols-3">
-				<Metric icon={tab === "brands" ? Tag : Building2} label={`Total ${tab}`} value={items.length} />
-				<Metric icon={PackageCheck} label="Products assigned" value={items.reduce((total, item) => total + item._count.products, 0)} />
-				<Metric icon={Building2} label="Enabled" value={items.filter((item) => item.status === "ACTIVE").length} />
+				<Metric icon={tab === "brands" ? Tag : Building2} label={`Total ${tab}`} value={summary?.total ?? 0} />
+				<Metric icon={PackageCheck} label="Products assigned" value={summary?.productsAssigned ?? 0} />
+				<Metric icon={Building2} label="Enabled" value={summary?.enabled ?? 0} />
 			</div>
+			{error ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
 			<section className="mt-4 overflow-hidden rounded-xl border border-border bg-surface shadow-card">
 				<div className="flex items-center justify-between border-b border-border p-4">
-					<h2 className="text-[13.5px] font-semibold text-ink">{tab === "brands" ? "Brands" : "Suppliers"} ({shown.length})</h2>
+					<h2 className="text-[13.5px] font-semibold text-ink">{tab === "brands" ? "Brands" : "Suppliers"} ({meta?.total ?? 0})</h2>
+					<div className="flex flex-wrap items-center gap-2">
+					<select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} aria-label="Status" className={fieldClass}><option value="">All statuses</option><option value="ACTIVE">Enabled</option><option value="INACTIVE">Disabled</option></select>
 					<label className="relative">
 						<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-						<input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search by name" className="h-9 w-64 rounded-md border border-border-strong pl-9 pr-3 text-xs outline-none" />
+						<input value={q} onChange={(event) => setQ(event.target.value)} placeholder={tab === "brands" ? "Search by name" : "Search by name or city"} className="h-9 w-64 rounded-md border border-border-strong pl-9 pr-3 text-xs outline-none" />
 					</label>
+					</div>
 				</div>
 				<table className="w-full min-w-[650px] text-left">
 					<thead className="bg-canvas text-[10.5px] uppercase tracking-wide text-ink-muted">
@@ -92,7 +106,7 @@ export function BrandsSuppliersPage() {
 					<tbody className="divide-y divide-border">
 						{loading ? (
 							<tr><td colSpan={6} className="h-36"><LoaderCircle className="mx-auto h-5 w-5 animate-spin" /></td></tr>
-						) : shown.map((item) => (
+						) : items.map((item) => (
 							<tr key={item.id} className="hover:bg-canvas">
 								<td className="px-4 py-3 font-mono text-xs text-ink-muted">{item.id}</td>
 								<td className="px-4 py-3">
@@ -124,8 +138,20 @@ export function BrandsSuppliersPage() {
 								</td>
 							</tr>
 						))}
+						{!loading && !items.length ? <tr><td colSpan={6} className="h-36 text-center text-[13px] text-ink-muted">{search || status ? `No ${tab} match these filters.` : `No ${tab} yet.`}</td></tr> : null}
 					</tbody>
 				</table>
+				{meta && meta.total ? (
+					<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-ink-muted">
+						<span>Showing <strong className="text-ink">{from}–{to}</strong> of <strong className="text-ink">{meta.total}</strong></span>
+						<div className="flex items-center gap-3">
+							<label className="flex items-center gap-2">Rows per page<select value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }} className={fieldClass}>{PER_PAGE_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+							<span>Page {meta.page} of {Math.max(meta.totalPages, 1)}</span>
+							<button type="button" disabled={meta.page <= 1} onClick={() => setPage((current) => current - 1)} aria-label="Previous page" className={pageButton}><ChevronLeft className="h-4 w-4" /></button>
+							<button type="button" disabled={meta.page >= meta.totalPages} onClick={() => setPage((current) => current + 1)} aria-label="Next page" className={pageButton}><ChevronRight className="h-4 w-4" /></button>
+						</div>
+					</div>
+				) : null}
 			</section>
 		</div>
 	);

@@ -1,13 +1,15 @@
 "use client";
 
 import { CURRENCY_SYMBOL } from "@/lib/currency";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, LoaderCircle, Save } from "lucide-react";
+import { AlertTriangle, ArrowLeft, LoaderCircle, Package, Save } from "lucide-react";
+import { mediaFileUrl } from "@/lib/media";
 
 type QuoteStatus = "NEW" | "REVIEWING" | "QUOTED" | "ACCEPTED" | "DECLINED" | "EXPIRED";
-type QuoteItem = { id: number; quantity: number; quotedUnitPrice: string | null; productVariant: { id: number; title: string; price: string; salePrice: string | null; product: { id: number; title: string; slug: string } } };
+type QuoteItem = { id: number; quantity: number; quotedUnitPrice: string | null; productVariant: { id: number; title: string; price: string; salePrice: string | null; product: { id: number; title: string; slug: string; image: { url: string; altText: string | null } | null } } };
 type QuoteRequest = { id: number; uuid: string; companyName: string | null; contactName: string; email: string; phone: string | null; message: string | null; status: QuoteStatus; quotedTotal: string | null; adminNote: string | null; createdAt: string; respondedAt: string | null; items: QuoteItem[]; user: { id: number; email: string; firstName: string; lastName: string } | null };
 
 const input = "mt-2 h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] font-normal text-ink outline-none focus:border-accent-strong";
@@ -83,7 +85,7 @@ export function QuoteDetail({ id }: { id: number }) {
           <tbody className="divide-y divide-border">
             {quote.items.map((item) => (
               <tr key={item.id}>
-                <td className="px-4 py-3"><p className="text-[13px] font-semibold text-ink">{item.productVariant.product.title}</p><p className="mt-0.5 text-[11px] text-ink-muted">{item.productVariant.title}</p></td>
+                <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md border border-border bg-neutral-tint">{item.productVariant.product.image ? <Image src={mediaFileUrl(item.productVariant.product.image.url)} alt={item.productVariant.product.image.altText || item.productVariant.product.title} fill unoptimized sizes="44px" className="object-cover" /> : <div className="flex h-full items-center justify-center text-ink-faint"><Package className="h-5 w-5" /></div>}</div><div className="min-w-0"><p className="text-[13px] font-semibold text-ink">{item.productVariant.product.title}</p><p className="mt-0.5 text-[11px] text-ink-muted">{item.productVariant.title}</p></div></div></td>
                 <td className="px-4 py-3 text-xs text-ink-muted">{item.quantity}</td>
                 <td className="px-4 py-3 text-xs text-ink-muted">{CURRENCY_SYMBOL}{Number(item.productVariant.salePrice ?? item.productVariant.price).toFixed(2)}</td>
                 <td className="px-4 py-3"><input type="number" min="0" step="0.01" value={itemPrices[item.id] ?? ""} onChange={(event) => setItemPrices((current) => ({ ...current, [item.id]: event.target.value }))} className="h-9 w-32 rounded-md border border-border-strong px-2.5 text-xs" /></td>

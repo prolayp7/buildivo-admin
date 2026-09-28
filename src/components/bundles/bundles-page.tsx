@@ -4,7 +4,8 @@ import { CURRENCY_SYMBOL } from "@/lib/currency";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, LoaderCircle, MoreHorizontal, PackagePlus, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, Eye, LoaderCircle, MoreHorizontal, PackagePlus, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type BundleStatus = "ACTIVE" | "INACTIVE";
@@ -17,7 +18,7 @@ type Bundle = {
   startsAt: string | null;
   endsAt: string | null;
   status: BundleStatus;
-  items: { productVariantId: number; quantity: number; productVariant: { product: { title: string } } }[];
+  items: { productVariantId: number; quantity: number; productVariant: { title: string; price: string; salePrice: string | null; stockQty: number; product: { id: number; title: string } } }[];
 };
 type Meta = { page: number; perPage: number; total: number; totalPages: number };
 
@@ -39,6 +40,17 @@ function apiMessage(payload: unknown, fallback: string) {
   if (payload && typeof payload === "object" && "message" in payload && typeof (payload as { message?: unknown }).message === "string") return (payload as { message: string }).message;
   return fallback;
 }
+type Schedule = "LIVE" | "SCHEDULED" | "EXPIRED";
+const PER_PAGE_OPTIONS = [20, 50, 100] as const;
+// Mirrors the API's schedule filter: where "now" falls in the startsAt/endsAt window.
+function scheduleOf(bundle: Bundle): Schedule {
+  const now = Date.now();
+  if (bundle.startsAt && new Date(bundle.startsAt).getTime() > now) return "SCHEDULED";
+  if (bundle.endsAt && new Date(bundle.endsAt).getTime() < now) return "EXPIRED";
+  return "LIVE";
+}
+function money(value: number | string) { return `${CURRENCY_SYMBOL}${Number(value).toFixed(2)}`; }
+function dateText(value: string | null) { return value ? new Date(value).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"; }
 function cell(value: unknown) { return `"${String(value ?? "").replace(/^[\s]*[=+\-@]/, "'$&").replaceAll('"', '""')}"`; }
 
 export function BundlesPage() {
@@ -52,7 +64,10 @@ export function BundlesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<BundleStatus | "">("");
+  const [schedule, setSchedule] = useState<Schedule | "">("");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState<number>(20);
+  const [viewing, setViewing] = useState<Bundle | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -61,12 +76,13 @@ export function BundlesPage() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  const query = useCallback((requestedPage = page, perPage = 20) => {
-    const params = new URLSearchParams({ page: String(requestedPage), perPage: String(perPage) });
+  const query = useCallback((requestedPage = page, size = perPage) => {
+    const params = new URLSearchParams({ page: String(requestedPage), perPage: String(size) });
     if (search) params.set("q", search);
     if (status) params.set("status", status);
+    if (schedule) params.set("schedule", schedule);
     return params;
-  }, [page, search, status]);
+  }, [page, perPage, search, status, schedule]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,7 +103,9 @@ export function BundlesPage() {
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
-  const filtersActive = Boolean(searchInput || status);
+  const filtersActive = Boolean(searchInput || status || schedule);
+  const from = meta.total ? (meta.page - 1) * meta.perPage + 1 : 0;
+  const to = Math.min(meta.page * meta.perPage, meta.total);
   const allSelected = items.length > 0 && items.every((bundle) => selected.has(bundle.id));
 
   function toggleOne(id: number) {
@@ -232,8 +250,10 @@ export function BundlesPage() {
       <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center">
         <div><h2 className="text-[13.5px] font-semibold text-ink">Bundles ({meta.total})</h2><p className="mt-0.5 text-[11.5px] text-ink-muted">Select rows to enable, disable or delete bundles.</p></div>
         <div className="flex flex-1 flex-col gap-2 sm:flex-row lg:ml-auto lg:max-w-2xl">
-          <label className="relative flex-1"><span className="sr-only">Search bundles</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" /><input value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1); }} placeholder="Search bundles" className="h-9 w-full rounded-md border border-border-strong pl-9 pr-3 text-xs" /></label>
+          <label className="relative flex-1"><span className="sr-only">Search bundles</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" /><input value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setPage(1); }} placeholder="Bundle name, slug or product" className="h-9 w-full rounded-md border border-border-strong pl-9 pr-3 text-xs" /></label>
           <select value={status} onChange={(event) => { setStatus(event.target.value as BundleStatus | ""); setPage(1); }} aria-label="Filter by bundle status" className="h-9 rounded-md border border-border-strong bg-surface px-3 text-xs text-ink-secondary"><option value="">All statuses</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
+          <select value={schedule} onChange={(event) => { setSchedule(event.target.value as Schedule | ""); setPage(1); }} aria-label="Filter by schedule" className="h-9 rounded-md border border-border-strong bg-surface px-3 text-xs text-ink-secondary"><option value="">Any schedule</option><option value="LIVE">Within dates</option><option value="SCHEDULED">Starts later</option><option value="EXPIRED">Ended</option></select>
+          {filtersActive ? <button type="button" onClick={() => { setSearchInput(""); setSearch(""); setStatus(""); setSchedule(""); setPage(1); }} className="inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint"><X className="h-4 w-4" />Clear</button> : null}
         </div>
       </div>
       {notice ? <div role="status" className="border-b border-positive-tint-border bg-positive-tint px-4 py-2.5 text-xs text-positive-tint-ink">{notice}</div> : null}
@@ -246,11 +266,11 @@ export function BundlesPage() {
           <tbody className="divide-y divide-border">
             {loading ? <tr><td colSpan={6} className="h-36"><LoaderCircle className="mx-auto h-5 w-5 animate-spin text-ink-muted" /></td></tr>
               : !items.length ? <tr><td colSpan={6} className="p-10 text-center text-[13px] text-ink-muted"><PackagePlus className="mx-auto mb-2 h-6 w-6" />{filtersActive ? "No bundles match these filters." : "No bundles yet."}</td></tr>
-                : items.map((bundle) => <tr key={bundle.id} className="hover:bg-canvas/70"><td className="px-4 py-3"><input type="checkbox" checked={selected.has(bundle.id)} onChange={() => toggleOne(bundle.id)} aria-label={`Select ${bundle.title}`} /></td><td className="px-4 py-3"><p className="text-[13px] font-semibold text-ink">{bundle.title}</p><p className="mt-0.5 font-mono text-[10.5px] text-ink-muted">{bundle.slug}</p></td><td className="px-4 py-3 text-xs text-ink-muted">{bundle.items.length}</td><td className="px-4 py-3 text-xs font-semibold text-ink">{CURRENCY_SYMBOL}{Number(bundle.bundlePrice).toFixed(2)}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${bundle.status === "ACTIVE" ? "bg-positive-tint text-positive-tint-ink" : "bg-neutral-tint text-ink-muted"}`}>{bundle.status === "ACTIVE" ? "Active" : "Inactive"}</span></td><td className="px-4 py-3 text-right"><BundleRowActions bundle={bundle} disabled={mutating} onDuplicate={() => void duplicateBundle(bundle)} onStatus={(next) => void updateOneStatus(bundle, next)} onDelete={() => void deleteOne(bundle)} /></td></tr>)}
+                : items.map((bundle) => <tr key={bundle.id} className="hover:bg-canvas/70"><td className="px-4 py-3"><input type="checkbox" checked={selected.has(bundle.id)} onChange={() => toggleOne(bundle.id)} aria-label={`Select ${bundle.title}`} /></td><td className="px-4 py-3"><button type="button" onClick={() => setViewing(bundle)} title="Quick view" className="text-left text-[13px] font-semibold text-ink hover:text-accent-strong hover:underline">{bundle.title}</button><p className="mt-0.5 font-mono text-[10.5px] text-ink-muted">{bundle.slug}</p></td><td className="px-4 py-3 text-xs text-ink-muted">{bundle.items.length}</td><td className="px-4 py-3 text-xs font-semibold text-ink">{CURRENCY_SYMBOL}{Number(bundle.bundlePrice).toFixed(2)}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${bundle.status === "ACTIVE" ? "bg-positive-tint text-positive-tint-ink" : "bg-neutral-tint text-ink-muted"}`}>{bundle.status === "ACTIVE" ? "Active" : "Inactive"}</span>{scheduleOf(bundle) !== "LIVE" ? <span className="ml-1.5 rounded-full bg-accent-tint px-2 py-1 text-[10.5px] font-semibold text-accent-tint-ink">{scheduleOf(bundle) === "SCHEDULED" ? "Starts later" : "Ended"}</span> : null}</td><td className="px-4 py-3"><div className="flex items-center justify-end gap-1"><button type="button" onClick={() => setViewing(bundle)} aria-label={`Quick view ${bundle.title}`} title="Quick view" className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-neutral-tint hover:text-ink"><Eye className="h-4 w-4" /></button><BundleRowActions bundle={bundle} disabled={mutating} onDuplicate={() => void duplicateBundle(bundle)} onStatus={(next) => void updateOneStatus(bundle, next)} onDelete={() => void deleteOne(bundle)} /></div></td></tr>)}
           </tbody>
         </table>
       </div>
-      {!loading && meta.totalPages > 1 ? <footer className="flex items-center justify-between border-t border-border px-4 py-3"><p className="text-xs text-ink-muted">Page {meta.page} of {meta.totalPages} · {meta.total} bundles</p><div className="flex gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary disabled:opacity-45"><ChevronLeft className="h-4 w-4" />Previous</button><button type="button" disabled={page >= meta.totalPages} onClick={() => setPage((value) => value + 1)} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary disabled:opacity-45">Next<ChevronRight className="h-4 w-4" /></button></div></footer> : null}
+      {meta.total ? <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-ink-muted"><span>Showing <strong className="text-ink">{from}–{to}</strong> of <strong className="text-ink">{meta.total}</strong></span><div className="flex items-center gap-3"><label className="flex items-center gap-2">Rows per page<select value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }} className="h-9 rounded-md border border-border-strong bg-surface px-2 text-xs text-ink">{PER_PAGE_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><span>Page {meta.page} of {Math.max(meta.totalPages, 1)}</span><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} aria-label="Previous page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-ink-secondary hover:bg-neutral-tint disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><button type="button" disabled={page >= meta.totalPages} onClick={() => setPage((value) => value + 1)} aria-label="Next page" className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-ink-secondary hover:bg-neutral-tint disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div></footer> : null}
     </section>
     <Dialog open={deleteDialogOpen} onOpenChange={(open) => { if (!mutating) setDeleteDialogOpen(open); }}>
       <DialogContent>
@@ -264,7 +284,36 @@ export function BundlesPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {viewing ? <BundleQuickView bundle={viewing} onClose={() => setViewing(null)} /> : null}
   </div>;
+}
+
+function BundleQuickView({ bundle, onClose }: { bundle: Bundle; onClose: () => void }) {
+  // What the items would cost bought separately, at their current (sale) prices.
+  const partsTotal = bundle.items.reduce((sum, item) => sum + Number(item.productVariant.salePrice ?? item.productVariant.price) * item.quantity, 0);
+  const saving = partsTotal - Number(bundle.bundlePrice);
+  const available = Math.min(...bundle.items.map((item) => Math.floor(item.productVariant.stockQty / item.quantity)));
+  const schedule = scheduleOf(bundle);
+  return <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}><SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+    <SheetHeader><SheetTitle>{bundle.title}</SheetTitle><SheetDescription className="font-mono text-[11px]">{bundle.slug}</SheetDescription></SheetHeader>
+    <div className="space-y-5 px-4 pb-6">
+      <div className="flex flex-wrap gap-1.5"><span className={`rounded-full px-2 py-1 text-[10.5px] font-semibold ${bundle.status === "ACTIVE" ? "bg-positive-tint text-positive-tint-ink" : "bg-neutral-tint text-ink-muted"}`}>{bundle.status === "ACTIVE" ? "Active" : "Inactive"}</span>{bundle.startsAt || bundle.endsAt ? <span className="rounded-full bg-neutral-tint px-2 py-1 text-[10.5px] font-semibold text-ink-muted">{schedule === "LIVE" ? "Within dates" : schedule === "SCHEDULED" ? "Starts later" : "Ended"}</span> : null}</div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-lg bg-canvas p-3"><p className="text-[10.5px] font-semibold uppercase tracking-wide text-ink-muted">Bundle price</p><p className="mt-1 text-[15px] font-semibold text-ink">{money(bundle.bundlePrice)}</p></div>
+        <div className="rounded-lg bg-canvas p-3"><p className="text-[10.5px] font-semibold uppercase tracking-wide text-ink-muted">Bought separately</p><p className="mt-1 text-[15px] font-semibold text-ink">{money(partsTotal)}</p></div>
+        <div className="rounded-lg bg-canvas p-3"><p className="text-[10.5px] font-semibold uppercase tracking-wide text-ink-muted">Customer saves</p><p className={`mt-1 text-[15px] font-semibold ${saving > 0 ? "text-positive-tint-ink" : "text-danger-tint-ink"}`}>{money(saving)}{partsTotal > 0 ? <span className="ml-1 text-[11px] font-medium">({Math.round((saving / partsTotal) * 100)}%)</span> : null}</p></div>
+      </div>
+      {saving <= 0 ? <p className="flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink"><AlertTriangle className="h-4 w-4 shrink-0" />The bundle costs the same as or more than buying the items separately.</p> : null}
+      <div>
+        <h3 className="text-[13px] font-semibold text-ink">Items ({bundle.items.length})</h3>
+        <ul className="mt-2 divide-y divide-border rounded-lg border border-border">{bundle.items.map((item) => { const unit = Number(item.productVariant.salePrice ?? item.productVariant.price); return <li key={item.productVariantId} className="flex items-start justify-between gap-3 p-3"><div className="min-w-0"><Link href={`/products/${item.productVariant.product.id}`} className="text-[13px] font-medium text-ink hover:text-accent-strong hover:underline">{item.productVariant.product.title}</Link><p className="mt-0.5 text-[11.5px] text-ink-muted">{item.productVariant.title} · <span className={item.productVariant.stockQty < item.quantity ? "font-semibold text-danger-tint-ink" : ""}>{item.productVariant.stockQty} in stock</span></p></div><div className="shrink-0 text-right text-xs"><p className="font-semibold text-ink">{item.quantity} × {money(unit)}</p><p className="mt-0.5 text-ink-muted">{money(unit * item.quantity)}</p></div></li>; })}</ul>
+        <p className="mt-2 text-xs text-ink-muted">Stock covers <strong className="text-ink">{Math.max(available, 0)}</strong> {available === 1 ? "bundle" : "bundles"}.</p>
+      </div>
+      <dl className="grid grid-cols-2 gap-3 text-xs"><div><dt className="text-ink-muted">Starts</dt><dd className="mt-0.5 font-medium text-ink">{dateText(bundle.startsAt)}</dd></div><div><dt className="text-ink-muted">Ends</dt><dd className="mt-0.5 font-medium text-ink">{dateText(bundle.endsAt)}</dd></div></dl>
+      {bundle.description ? <div><h3 className="text-[13px] font-semibold text-ink">Description</h3><p className="mt-1 whitespace-pre-line text-xs leading-5 text-ink-secondary">{bundle.description}</p></div> : null}
+      <Link href={`/bundles/${bundle.id}/edit`} className="inline-flex h-9 items-center gap-2 rounded-md bg-ink px-4 text-xs font-semibold text-white"><Pencil className="h-4 w-4" />Edit bundle</Link>
+    </div>
+  </SheetContent></Sheet>;
 }
 
 function BundleRowActions({ bundle, disabled, onDuplicate, onStatus, onDelete }: { bundle: Bundle; disabled: boolean; onDuplicate: () => void; onStatus: (status: BundleStatus) => void; onDelete: () => void }) {

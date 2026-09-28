@@ -201,7 +201,7 @@ export function CustomersPage({ initialSearch = "", initialOpenId = null }: { in
   </div>;
 }
 
-function CustomerDrawer({ id, onClose, onChanged }: { id: number; onClose: () => void; onChanged: () => void }) {
+export function CustomerDrawer({ id, onClose, onChanged }: { id: number; onClose: () => void; onChanged: () => void }) {
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [error, setError] = useState("");

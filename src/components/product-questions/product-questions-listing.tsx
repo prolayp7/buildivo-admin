@@ -1,15 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, LoaderCircle, MessageCircleQuestion, Send, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle, MessageCircleQuestion, Search, Send, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { collectionFromApi } from "@/lib/api-response";
 
 type QuestionStatus = "PENDING" | "PUBLISHED" | "REJECTED";
 type Answer = { id: number; answer: string; createdAt: string };
 type Question = { id: number; name: string; question: string; status: QuestionStatus; createdAt: string; product: { id: number; title: string }; answers: Answer[] };
 
 function apiMessage(payload: unknown, fallback: string) { if (payload && typeof payload === "object" && "message" in payload) { const value = (payload as { message?: unknown }).message; if (typeof value === "string") return value; if (Array.isArray(value) && typeof value[0] === "string") return value[0]; } return fallback; }
+type Meta = { page: number; perPage: number; total: number; totalPages: number; summary?: { pendingCount: number } };
+const PER_PAGE_OPTIONS = [20, 50, 100] as const;
+const fieldClass = "h-9 rounded-md border border-border-strong bg-surface px-2.5 text-[13px] text-ink outline-none focus:border-accent-strong";
+const emptyFilters = { q: "", dateFrom: "", dateTo: "" };
 const statusTone: Record<QuestionStatus, string> = { PENDING: "bg-accent-tint text-accent-tint-ink", PUBLISHED: "bg-positive-tint text-positive-tint-ink", REJECTED: "bg-danger-tint text-danger-tint-ink" };
 
 export function ProductQuestionsListing() {
@@ -17,6 +20,8 @@ export function ProductQuestionsListing() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | QuestionStatus>("PENDING");
+  const [filters, setFilters] = useState(emptyFilters), [search, setSearch] = useState(""); // search = debounced filters.q
+  const [page, setPage] = useState(1), [perPage, setPerPage] = useState<number>(20), [meta, setMeta] = useState<Meta | null>(null);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [mutatingId, setMutatingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Question | null>(null);
@@ -25,17 +30,23 @@ export function ProductQuestionsListing() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const params = new URLSearchParams({ page: "1", perPage: "100" });
+      const params = new URLSearchParams({ page: String(page), perPage: String(perPage) });
       if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (search) params.set("q", search);
+      if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+      if (filters.dateTo) params.set("dateTo", filters.dateTo);
       const response = await fetch(`/api/product-questions?${params}`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) throw new Error(apiMessage(payload, "Questions could not be loaded."));
-      setItems(collectionFromApi<Question>(payload));
+      setItems((payload.data ?? []) as Question[]); setMeta(payload.meta as Meta);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Questions could not be loaded.");
     } finally { setLoading(false); }
-  }, [statusFilter]);
+  }, [statusFilter, page, perPage, search, filters.dateFrom, filters.dateTo]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(() => { setSearch(filters.q.trim()); setPage(1); }, 300); return () => window.clearTimeout(timer); }, [filters.q]);
+  const setFilter = (patch: Partial<typeof emptyFilters>) => { setFilters((current) => ({ ...current, ...patch })); if (!("q" in patch)) setPage(1); };
+  const filtered = Boolean(search || filters.dateFrom || filters.dateTo);
 
   async function publish(question: Question) {
     const answer = (drafts[question.id] ?? "").trim();
@@ -75,7 +86,10 @@ export function ProductQuestionsListing() {
     } finally { setDeleting(false); }
   }
 
-  const pendingCount = items.filter((item) => item.status === "PENDING").length;
+  const pendingCount = meta?.summary?.pendingCount ?? 0;
+  const from = meta && meta.total ? (meta.page - 1) * meta.perPage + 1 : 0;
+  const to = meta ? Math.min(meta.page * meta.perPage, meta.total) : 0;
+  const pageButton = "flex h-8 w-8 items-center justify-center rounded-md border border-border text-ink-secondary hover:bg-neutral-tint disabled:opacity-40";
 
   return (
     <div className="w-full">
@@ -84,9 +98,16 @@ export function ProductQuestionsListing() {
       {error ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
       <div className="mt-5 flex gap-1 border-b border-border">
         {([{ id: "PENDING", label: `Pending${pendingCount ? ` (${pendingCount})` : ""}` }, { id: "PUBLISHED", label: "Published" }, { id: "REJECTED", label: "Rejected" }, { id: "ALL", label: "All" }] as const).map((item) => (
-          <button key={item.id} type="button" onClick={() => setStatusFilter(item.id)} className={`relative px-3 py-2.5 text-[13px] font-semibold ${statusFilter === item.id ? "text-ink after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-ink" : "text-ink-muted hover:text-ink"}`}>{item.label}</button>
+          <button key={item.id} type="button" onClick={() => { setStatusFilter(item.id); setPage(1); }} className={`relative px-3 py-2.5 text-[13px] font-semibold ${statusFilter === item.id ? "text-ink after:absolute after:inset-x-1 after:bottom-0 after:h-0.5 after:bg-ink" : "text-ink-muted hover:text-ink"}`}>{item.label}</button>
         ))}
       </div>
+      <div className="mt-4 flex flex-wrap items-end gap-2.5 rounded-xl border border-border bg-surface p-3 shadow-card">
+        <label className="relative min-w-[240px] flex-1"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" /><input value={filters.q} onChange={(event) => setFilter({ q: event.target.value })} placeholder="Question, product, answer, customer name or email" className={`${fieldClass} w-full pl-8`} /></label>
+        <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">From<input type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(event) => setFilter({ dateFrom: event.target.value })} className={`${fieldClass} mt-1 block`} /></label>
+        <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">To<input type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(event) => setFilter({ dateTo: event.target.value })} className={`${fieldClass} mt-1 block`} /></label>
+        {filtered ? <button type="button" onClick={() => { setFilters(emptyFilters); setSearch(""); setPage(1); }} className="inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-[13px] font-semibold text-ink-secondary hover:bg-neutral-tint"><X className="h-4 w-4" />Clear</button> : null}
+      </div>
+      {filtered && meta ? <p className="mt-2 text-xs text-ink-muted">Matching: <strong className="text-ink">{meta.total}</strong> {meta.total === 1 ? "question" : "questions"}</p> : null}
       {loading ? (
         <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-ink-muted" /></div>
       ) : (
@@ -127,7 +148,18 @@ export function ProductQuestionsListing() {
           {!items.length ? (
             <div className="rounded-xl border border-border bg-surface p-10 text-center shadow-card">
               <MessageCircleQuestion className="mx-auto h-6 w-6 text-ink-muted" />
-              <p className="mt-3 text-[13px] text-ink-muted">No questions in this view.</p>
+              <p className="mt-3 text-[13px] text-ink-muted">{filtered ? "No questions match these filters." : "No questions in this view."}</p>
+            </div>
+          ) : null}
+          {meta && meta.total ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-xs text-ink-muted shadow-card">
+              <span>Showing <strong className="text-ink">{from}–{to}</strong> of <strong className="text-ink">{meta.total}</strong></span>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2">Per page<select value={perPage} onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }} className={fieldClass}>{PER_PAGE_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+                <span>Page {meta.page} of {Math.max(meta.totalPages, 1)}</span>
+                <button type="button" disabled={meta.page <= 1} onClick={() => setPage((current) => current - 1)} aria-label="Previous page" className={pageButton}><ChevronLeft className="h-4 w-4" /></button>
+                <button type="button" disabled={meta.page >= meta.totalPages} onClick={() => setPage((current) => current + 1)} aria-label="Next page" className={pageButton}><ChevronRight className="h-4 w-4" /></button>
+              </div>
             </div>
           ) : null}
         </div>
