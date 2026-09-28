@@ -53,7 +53,7 @@ export function ProductPicker({ value, onChange }: { value: PickedProduct | null
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open || !query.trim()) { setResults([]); return; }
+    if (!open || !query.trim()) return;
     const timer = window.setTimeout(async () => {
       setSearching(true);
       try {
@@ -97,7 +97,7 @@ export function ProductPicker({ value, onChange }: { value: PickedProduct | null
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
         <input
           value={query}
-          onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+          onChange={(event) => { setQuery(event.target.value); setResults([]); setOpen(true); }}
           onFocus={() => setOpen(true)}
           placeholder="Search products by name or SKU"
           className="h-10 w-full rounded-md border border-border-strong bg-surface pl-9 pr-3 text-[13px] outline-none focus:border-accent-strong"

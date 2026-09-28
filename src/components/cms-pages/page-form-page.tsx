@@ -74,7 +74,7 @@ export function PageFormPage({ pageId }: { pageId?: number }) {
             </div>
           </section>
 
-          <SeoPanel pathPrefix="" noun="page" results={results} title={title} excerpt="" slug={slug} siteHost={SITE_HOST} keywords={keywords} setKeywords={setKeywords} metaTitle={metaTitle} setMetaTitle={setMetaTitle} metaDescription={metaDescription} setMetaDescription={setMetaDescription} />
+          <SeoPanel pathPrefix="" noun="page" socialEnabled={false} results={results} title={title} excerpt="" slug={slug} siteHost={SITE_HOST} keywords={keywords} setKeywords={setKeywords} metaTitle={metaTitle} setMetaTitle={setMetaTitle} metaDescription={metaDescription} setMetaDescription={setMetaDescription} />
         </div>
 
         <aside className="space-y-5 xl:sticky xl:top-5">

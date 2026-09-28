@@ -7,12 +7,11 @@ import { collectionFromApi } from "@/lib/api-response";
 import { TradeCtaDialog } from "./trade-cta-dialog";
 import { CalculatorsDialog } from "./calculators-dialog";
 import { EcosystemMatcherDialog } from "./ecosystem-matcher-dialog";
-import { ProjectKitsDialog } from "./project-kits-dialog";
 
 const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? "http://localhost:3002";
 
 type SectionType = "HERO" | "TRUST_STRIP" | "DEPARTMENTS" | "FEATURED_PRODUCTS" | "PROJECT_KITS" | "TRADE_CTA" | "CALCULATORS" | "ECOSYSTEM_MATCHER";
-type Section = { id: number; type: SectionType; label: string; sortOrder: number; isVisible: boolean; config: Record<string, string> };
+type Section = { id: number; type: SectionType; label: string; sortOrder: number; isVisible: boolean; config: Record<string, unknown> };
 
 function apiMessage(payload: unknown, fallback: string) { if (payload && typeof payload === "object" && "message" in payload) { const value = (payload as { message?: unknown }).message; if (typeof value === "string") return value; if (Array.isArray(value) && typeof value[0] === "string") return value[0]; } return fallback; }
 
@@ -32,10 +31,10 @@ const meta: Record<SectionType, { icon: typeof LayoutTemplate; description: stri
 };
 // Where each section's actual content is authored, for the types that have
 // one - this panel only controls order/visibility, never the content itself.
-const contentLink: Partial<Record<SectionType, string>> = { HERO: "/merchandising", TRUST_STRIP: "/merchandising", DEPARTMENTS: "/categories", FEATURED_PRODUCTS: "/products" };
+const contentLink: Partial<Record<SectionType, string>> = { HERO: "/merchandising", TRUST_STRIP: "/merchandising", DEPARTMENTS: "/categories", FEATURED_PRODUCTS: "/products", PROJECT_KITS: "/homepage/project-kits" };
 // Section types with an in-panel content editor (via `config`), rather than a
 // deep-link to another page.
-const configEditableTypes = ["PROJECT_KITS", "TRADE_CTA", "CALCULATORS", "ECOSYSTEM_MATCHER"] as const;
+const configEditableTypes = ["TRADE_CTA", "CALCULATORS", "ECOSYSTEM_MATCHER"] as const;
 type ConfigEditableType = (typeof configEditableTypes)[number];
 
 export function HomepageListing() {
@@ -86,7 +85,6 @@ export function HomepageListing() {
       <iframe key={previewKey} src={STOREFRONT_URL} title="Storefront live preview" className="h-[80vh] w-full border-0 bg-canvas" />
     </div></div>
   </div>
-  {editingSection?.type === "PROJECT_KITS" ? <ProjectKitsDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "TRADE_CTA" ? <TradeCtaDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "CALCULATORS" ? <CalculatorsDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "ECOSYSTEM_MATCHER" ? <EcosystemMatcherDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}

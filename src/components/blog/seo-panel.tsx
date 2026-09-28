@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { ChevronDown, Globe, Monitor, Search, Share2, Smartphone, BookOpenText, Star, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { scoreTone, type Check, type SeoResult, type Status } from "@/components/blog/seo-analysis";
+import { mediaFileUrl } from "@/lib/media";
 
 const toneText: Record<Status, string> = { good: "text-positive", ok: "text-highlight-strong", bad: "text-danger" };
 const toneBg: Record<Status, string> = { good: "bg-positive", ok: "bg-highlight", bad: "bg-danger" };
@@ -77,10 +79,11 @@ function Analysis({ checks, labels }: { checks: Check[]; labels: [string, string
   );
 }
 
-function SocialCard({ title, description, siteHost, variant, noun }: { title: string; description: string; siteHost: string; variant: "facebook" | "x"; noun: string }) {
+function SocialCard({ title, description, siteHost, variant, noun, image, imageAlt }: { title: string; description: string; siteHost: string; variant: "facebook" | "x"; noun: string; image?: string | null; imageAlt?: string }) {
+  const src = image ? (image.startsWith("/uploads/") ? mediaFileUrl(image) : image) : null;
   return (
     <div className={cn("overflow-hidden border border-border bg-white shadow-card", variant === "facebook" ? "rounded-sm" : "rounded-2xl")}>
-      <div className="flex h-36 items-center justify-center bg-neutral-tint text-ink-faint"><Share2 className="h-8 w-8" /></div>
+      <div className="relative flex h-36 items-center justify-center overflow-hidden bg-neutral-tint text-ink-faint">{src ? <Image src={src} alt={imageAlt || "Social sharing preview"} fill unoptimized sizes="400px" className="object-cover" /> : <Share2 className="h-8 w-8" />}</div>
       <div className={cn("p-3", variant === "facebook" && "bg-[#f2f3f5]")}>
         <p className="text-[11px] uppercase text-ink-muted">{siteHost}</p>
         <p className="mt-0.5 line-clamp-2 text-[14px] font-semibold text-ink">{title || `${cap(noun)} title`}</p>
@@ -136,16 +139,24 @@ type Props = {
   keywords: string[]; setKeywords: (keywords: string[]) => void;
   metaTitle: string; setMetaTitle: (value: string) => void;
   metaDescription: string; setMetaDescription: (value: string) => void;
+  socialEnabled?: boolean;
+  socialShareImage?: string; socialShareImageAlt?: string; setSocialShareImageAlt?: (value: string) => void;
+  socialShareImageFile?: File | null; setSocialShareImageFile?: (file: File | null) => void;
+  twitterCard?: "SUMMARY" | "SUMMARY_LARGE_IMAGE"; setTwitterCard?: (value: "SUMMARY" | "SUMMARY_LARGE_IMAGE") => void;
 };
 
-export function SeoPanel({ results, pathPrefix = "blog", noun = "post", title, excerpt, slug, siteHost, keywords, setKeywords, metaTitle, setMetaTitle, metaDescription, setMetaDescription }: Props) {
+export function SeoPanel({ results, pathPrefix = "blog", noun = "post", title, excerpt, slug, siteHost, keywords, setKeywords, metaTitle, setMetaTitle, metaDescription, setMetaDescription, socialEnabled = true, socialShareImage = "", socialShareImageAlt = "", setSocialShareImageAlt = () => undefined, socialShareImageFile = null, setSocialShareImageFile = () => undefined, twitterCard = "SUMMARY_LARGE_IMAGE", setTwitterCard = () => undefined }: Props) {
   const [tab, setTab] = useState<"seo" | "readability" | "social">("seo");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [activeKeyword, setActiveKeyword] = useState(0);
   const activeIndex = Math.min(activeKeyword, results.length - 1);
   const result = results[0], activeResult = results[activeIndex];
   const seoTitle = metaTitle.trim() || title, seoDescription = metaDescription.trim() || excerpt;
-  const tabs = [{ id: "seo", label: "SEO", icon: Search, score: result.seoScore }, { id: "readability", label: "Readability", icon: BookOpenText, score: result.readabilityScore }, { id: "social", label: "Social", icon: Share2, score: null }] as const;
+  const filePreview = useMemo(() => socialShareImageFile ? URL.createObjectURL(socialShareImageFile) : null, [socialShareImageFile]);
+  useEffect(() => () => { if (filePreview) URL.revokeObjectURL(filePreview); }, [filePreview]);
+  const previewImage = filePreview || socialShareImage;
+  const tabs: { id: "seo" | "readability" | "social"; label: string; icon: typeof Search; score: number | null }[] = [{ id: "seo", label: "SEO", icon: Search, score: result.seoScore }, { id: "readability", label: "Readability", icon: BookOpenText, score: result.readabilityScore }];
+  if (socialEnabled) tabs.push({ id: "social", label: "Social", icon: Share2, score: null });
 
   return (
     <section className="rounded-xl border border-border bg-surface shadow-card">
@@ -200,10 +211,15 @@ export function SeoPanel({ results, pathPrefix = "blog", noun = "post", title, e
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-xs text-ink-muted">Preview of how this {noun} looks when shared. Uses your SEO title and meta description.</p>
+            <p className="text-xs text-ink-muted">Preview of how this {noun} looks when shared. Uses your SEO title, description, and share image.</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className={cn(labelClass, "block")}>Social share image<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => setSocialShareImageFile(event.target.files?.[0] ?? null)} className="mt-2 block w-full text-xs text-ink-muted" /><span className="mt-1 block text-[11px] font-normal text-ink-muted">Recommended: 1200×630px. JPG, PNG, WebP or AVIF.</span></label>
+              <label className={cn(labelClass, "block")}>Image alt text<input value={socialShareImageAlt} onChange={(event) => setSocialShareImageAlt(event.target.value)} maxLength={255} placeholder={title || "Describe the image"} className={inputClass} /></label>
+            </div>
+            <label className={cn(labelClass, "block")}>X/Twitter card<select value={twitterCard} onChange={(event) => setTwitterCard(event.target.value as "SUMMARY" | "SUMMARY_LARGE_IMAGE")} className={inputClass}><option value="SUMMARY_LARGE_IMAGE">Summary with large image</option><option value="SUMMARY">Summary</option></select></label>
             <div className="grid gap-5 md:grid-cols-2">
-              <div><p className="mb-2 text-[12px] font-semibold text-ink-secondary">Facebook</p><SocialCard title={seoTitle} description={seoDescription} siteHost={siteHost} variant="facebook" noun={noun} /></div>
-              <div><p className="mb-2 text-[12px] font-semibold text-ink-secondary">X (Twitter)</p><SocialCard title={seoTitle} description={seoDescription} siteHost={siteHost} variant="x" noun={noun} /></div>
+              <div><p className="mb-2 text-[12px] font-semibold text-ink-secondary">Facebook</p><SocialCard title={seoTitle} description={seoDescription} siteHost={siteHost} variant="facebook" noun={noun} image={previewImage} imageAlt={socialShareImageAlt} /></div>
+              <div><p className="mb-2 text-[12px] font-semibold text-ink-secondary">X (Twitter)</p><SocialCard title={seoTitle} description={seoDescription} siteHost={siteHost} variant="x" noun={noun} image={previewImage} imageAlt={socialShareImageAlt} /></div>
             </div>
           </div>
         )}

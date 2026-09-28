@@ -47,9 +47,10 @@ export function CategoryFormPage({ categoryId }: { categoryId?: number }) {
   function updateFaq(index: number, field: keyof CategoryFaq, value: string) { setFaqs((current) => current.map((faq, i) => (i === index ? { ...faq, [field]: value } : faq))); }
   function removeFaq(index: number) { setFaqs((current) => current.filter((_, i) => i !== index)); }
   function autoFillFaqsFromSchema() { const parsed = parseFaqSchema(faqSchema); if (!parsed) { setFaqSchemaError("Could not parse this JSON-LD."); return; } setFaqSchemaError(""); setFaqs(parsed); }
+  function isValidJson(value: string) { try { JSON.parse(value); return true; } catch { return false; } }
 
   async function submit(event: FormEvent) {
-    event.preventDefault(); if (!title.trim() || !slug.trim()) { toast.error("Category name and friendly URL are required."); return; } setSaving(true);
+    event.preventDefault(); if (!title.trim() || !slug.trim()) { toast.error("Category name and friendly URL are required."); return; } if ((schemaType === "CUSTOM" && customSchema.trim() && !isValidJson(customSchema)) || (faqSchema.trim() && !isValidJson(faqSchema))) { toast.error("Custom SEO schema must contain valid JSON-LD."); return; } setSaving(true);
     try {
       const nextCoverImageAlt = coverImageAlt.trim() || title.trim();
       const nextThumbnailImageAlt = thumbnailImageAlt.trim() || title.trim();
@@ -79,7 +80,7 @@ export function CategoryFormPage({ categoryId }: { categoryId?: number }) {
   </section>
   </section>
 
-  <section className="space-y-5 rounded-xl border border-border bg-surface p-5 shadow-card"><h2 className="text-sm font-semibold text-ink">Search engine optimisation</h2><div className="rounded-lg border border-border p-4 shadow-card"><p className="truncate text-xs text-[#202124]">ukcomputershop.co.uk › category › {slug || "category-url"}</p><p className="mt-1 truncate text-lg text-[#1a0dab]">{previewTitle}</p><p className="mt-1 line-clamp-2 text-[13px] leading-5 text-[#4d5156]">{previewDescription}</p></div>
+  <section className="space-y-5 rounded-xl border border-border bg-surface p-5 shadow-card"><h2 className="text-sm font-semibold text-ink">Search engine optimisation</h2><div className="rounded-lg border border-border p-4 shadow-card"><p className="truncate text-xs text-[#202124]">buildivo › c › {slug || "category-url"}</p><p className="mt-1 truncate text-lg text-[#1a0dab]">{previewTitle}</p><p className="mt-1 line-clamp-2 text-[13px] leading-5 text-[#4d5156]">{previewDescription}</p></div>
   <div className="mt-4 space-y-5">
     <div className={labelClass}><span className="inline-flex items-center gap-1">On-page SEO content<Help label="On-page SEO content">Optional longer content shown after the product listing, useful for buying guidance and category SEO.</Help></span><RichTextEditor value={additionalDescription} onChange={setAdditionalDescription} ariaLabel="On-page SEO content" placeholder="Add buying guidance, compatibility information or longer SEO content." minHeight="sm" /></div>
     <label className={labelClass}>Page header (H1)<input value={pageHeader} onChange={(event) => setPageHeader(event.target.value)} placeholder={title || "Category title"} className={inputClass} /></label>
