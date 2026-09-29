@@ -113,7 +113,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
       "/api/reviews?status=PENDING&perPage=1",
       "/api/quotes?status=NEW&perPage=1",
       "/api/product-questions?status=PENDING&perPage=1",
-      "/api/payments/returns?status=REQUESTED&perPage=1",
+      "/api/payments/returns?status=RETURN_REQUESTED&perPage=1",
       "/api/orders/summary",
       "/api/reports/inventory",
     ];
@@ -129,7 +129,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
     const candidates: AdminNotice[] = [
       { key: "low-stock", title: "Low stock items", detail: "At or below their reorder threshold", count: inventoryData.length, href: "/stock" },
       { key: "failed-payments", title: "Failed payments", detail: "Orders may need follow-up", count: typeof orderSummary.failedPayments === "number" ? orderSummary.failedPayments : 0, href: "/orders?paymentStatus=FAILED" },
-      { key: "returns", title: "Returns to review", detail: "Customer return requests", count: totalFrom(payloads[3]), href: "/payments/returns" },
+      { key: "returns", title: "Returns to review", detail: "Customer return requests", count: totalFrom(payloads[3]), href: "/payments/returns?status=RETURN_REQUESTED" },
       { key: "reviews", title: "Reviews to moderate", detail: "Awaiting approval", count: totalFrom(payloads[0]), href: "/reviews" },
       { key: "quotes", title: "New quote requests", detail: "Awaiting a response", count: totalFrom(payloads[1]), href: "/quotes" },
       { key: "questions", title: "Product questions", detail: "Awaiting an answer", count: totalFrom(payloads[2]), href: "/product-questions" },

@@ -103,7 +103,7 @@ export function DashboardOverview() {
         total("/api/reviews?status=PENDING&perPage=1"),
         total("/api/quotes?status=NEW&perPage=1"),
         total("/api/product-questions?status=PENDING&perPage=1"),
-        total("/api/payments/returns?status=REQUESTED&perPage=1"),
+        total("/api/payments/returns?status=RETURN_REQUESTED&perPage=1"),
         total("/api/orders?status=PROCESSING&perPage=1"),
         total("/api/orders?status=PACKED&perPage=1"),
         fetch("/api/reports/products?sort=best", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
@@ -142,7 +142,7 @@ export function DashboardOverview() {
         { icon: Truck, title: "Awaiting dispatch", detail: "confirmed, not yet shipped", count: awaitingDispatch, href: "/orders" },
         { icon: CreditCard, title: "Failed payments", detail: "need retry or manual capture", count: summary?.failedPayments ?? 0, href: "/orders", urgent: true },
         { icon: Star, title: "Reviews to moderate", detail: "awaiting approval", count: pendingReviews, href: "/reviews" },
-        { icon: Undo2, title: "Returns to process", detail: "RMA requests opened", count: returnsRequested, href: "/payments/returns" },
+        { icon: Undo2, title: "Returns to process", detail: "RMA requests opened", count: returnsRequested, href: "/payments/returns?status=RETURN_REQUESTED" },
         { icon: FileText, title: "Quote requests", detail: "new, not yet reviewed", count: newQuotes, href: "/quotes" },
         { icon: FileText, title: "Product Q&A", detail: "questions awaiting an answer", count: pendingQuestions, href: "/product-questions" },
       ]);
