@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { AlertTriangle, Bell, CheckCheck, ChevronDown, FileText, LoaderCircle, LogOut, Menu, MessageCircleQuestion, Package, RefreshCw, RotateCcw, Search, Settings, ShoppingCart, Star, Users, X } from "lucide-react";
+import { AlertTriangle, Bell, CheckCheck, ChevronDown, ExternalLink, FileText, LoaderCircle, LogOut, Menu, MessageCircleQuestion, Package, RefreshCw, RotateCcw, Search, Settings, ShoppingCart, Star, Users, X } from "lucide-react";
 import { pageTitleForPath } from "@/lib/nav";
+
+const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? "http://localhost:3002";
 
 type AdminUser = {
   id: number;
@@ -349,6 +351,17 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         >
           <Search className="h-[18px] w-[18px]" />
         </button>
+
+        <a
+          href={STOREFRONT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open storefront in a new tab"
+          title="Open storefront in a new tab"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-ink-secondary hover:bg-neutral-tint"
+        >
+          <ExternalLink className="h-[18px] w-[18px]" />
+        </a>
 
         <div ref={notificationRef} className="relative">
           <button type="button" onClick={() => { setNotificationsOpen((open) => !open); setMenuOpen(false); }} aria-label={notificationCount ? `Notifications, ${notificationCount} items need attention` : "Notifications"} aria-haspopup="dialog" aria-expanded={notificationsOpen} className="relative flex h-9 w-9 items-center justify-center rounded-md text-ink-secondary hover:bg-neutral-tint">
