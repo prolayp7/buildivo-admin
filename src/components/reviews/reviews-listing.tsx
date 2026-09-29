@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, BadgeCheck, Check, ChevronLeft, ChevronRight, LoaderCircle, Search, Star, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 type Review = { id: number; rating: number; title: string | null; comment: string | null; status: ReviewStatus; createdAt: string; reviewerName: string | null; orderItemId: number | null; product: { id: number; title: string }; user: { firstName: string; lastName: string; email: string } | null };
@@ -44,8 +45,8 @@ export function ReviewsListing() {
     <label className="relative min-w-[240px] flex-1"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" /><input value={filters.q} onChange={(event) => setFilter({ q: event.target.value })} placeholder="Title, comment, product, reviewer name or email" className={`${fieldClass} w-full pl-8`} /></label>
     <label className={labelClass}>Rating<select value={filters.rating} onChange={(event) => setFilter({ rating: event.target.value })} className={`${fieldClass} mt-1 block`}><option value="">Any rating</option>{[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} {value === 1 ? "star" : "stars"}</option>)}</select></label>
     <label className={labelClass}>Purchase<select value={filters.verified} onChange={(event) => setFilter({ verified: event.target.value })} className={`${fieldClass} mt-1 block`}><option value="">All reviews</option><option value="true">Verified purchase</option><option value="false">Not verified</option></select></label>
-    <label className={labelClass}>From<input type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(event) => setFilter({ dateFrom: event.target.value })} className={`${fieldClass} mt-1 block`} /></label>
-    <label className={labelClass}>To<input type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(event) => setFilter({ dateTo: event.target.value })} className={`${fieldClass} mt-1 block`} /></label>
+    <label className={labelClass}>From<DatePicker type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(value) => setFilter({ dateFrom: value })} className={`${fieldClass} mt-1 block`} /></label>
+    <label className={labelClass}>To<DatePicker type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(value) => setFilter({ dateTo: value })} className={`${fieldClass} mt-1 block`} /></label>
     {filtered ? <button type="button" onClick={() => { setFilters(emptyFilters); setSearch(""); setPage(1); }} className="inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-[13px] font-semibold text-ink-secondary hover:bg-neutral-tint"><X className="h-4 w-4" />Clear</button> : null}
   </div>
   {filtered && meta ? <p className="mt-2 text-xs text-ink-muted">Matching: <strong className="text-ink">{meta.total}</strong> {meta.total === 1 ? "review" : "reviews"}</p> : null}

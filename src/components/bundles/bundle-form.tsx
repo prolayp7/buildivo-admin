@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, Check, LoaderCircle, Plus, Save, Search, Trash2 } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type Variant = { id: number; price: string; salePrice: string | null; isDefault: boolean };
 type ProductOption = { id: number; title: string; variants: Variant[] };
@@ -108,8 +109,8 @@ export function BundleForm({ id }: { id?: number }) {
         <label className={label}>Slug<input value={slug} onChange={(event) => setSlug(slugify(event.target.value))} className={input} /></label>
         <label className={`${label} block`}>Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className={`${input} h-auto py-3`} /></label>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className={label}>Starts<input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className={input} /></label>
-          <label className={label}>Ends<input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className={input} /></label>
+          <label className={label}>Starts<DatePicker type="datetime-local" value={startsAt} onChange={setStartsAt} className={input} /></label>
+          <label className={label}>Ends<DatePicker type="datetime-local" value={endsAt} onChange={setEndsAt} className={input} /></label>
         </div>
       </section>
 
