@@ -32,7 +32,10 @@ export interface ProjectKit {
   image: string;
   imageAlt: string;
   active: boolean;
+  /** Product bundle opened by the kit's "View Material List"; empty = the general guides page. */
+  bundleSlug?: string;
 }
+type BundleOption = { slug: string; title: string; status: string };
 
 type ProjectKitsConfig = {
   badgeLabel: string;
@@ -153,6 +156,7 @@ export function ProjectKitsPage() {
     [uploading, setUploading] = useState<string | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [bundles, setBundles] = useState<BundleOption[] | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,6 +197,13 @@ export function ProjectKitsPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+  // Bundles a kit's "View Material List" can open; failing to load them only hides the choice.
+  useEffect(() => {
+    fetch("/api/bundles?page=1&perPage=100", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => { if (payload) setBundles(collectionFromApi<BundleOption>(payload)); })
+      .catch(() => undefined);
+  }, []);
 
   function updateKit(id: string, patch: Partial<ProjectKit>) {
     setConfig((current) => ({
@@ -524,6 +535,25 @@ export function ProjectKitsPage() {
                         }
                         className={inputClass}
                       />
+                    </label>
+                    <label className="block text-[13px] font-semibold text-ink-secondary">
+                      &ldquo;View Material List&rdquo; opens
+                      <select
+                        value={kit.bundleSlug ?? ""}
+                        onChange={(event) =>
+                          updateKit(kit.id, { bundleSlug: event.target.value || undefined })
+                        }
+                        className={inputClass}
+                      >
+                        <option value="">General guides page</option>
+                        {/* Only active bundles: an inactive bundle's storefront page is a 404. */}
+                        {(bundles ?? []).filter((bundle) => bundle.status === "ACTIVE").map((bundle) => (
+                          <option key={bundle.slug} value={bundle.slug}>
+                            {bundle.title}
+                          </option>
+                        ))}
+                        {kit.bundleSlug && !(bundles ?? []).some((bundle) => bundle.slug === kit.bundleSlug && bundle.status === "ACTIVE") ? <option value={kit.bundleSlug}>{kit.bundleSlug}{bundles ? " (not active: link will not work)" : ""}</option> : null}
+                      </select>
                     </label>
                     <label className="block text-[13px] font-semibold text-ink-secondary">
                       Image ALT text

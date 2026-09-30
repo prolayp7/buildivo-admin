@@ -2,7 +2,7 @@
 
 import { CURRENCY } from "@/lib/currency";
 import { DatePicker } from "@/components/ui/date-picker";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ChevronLeft, ChevronRight, ImagePlus, LoaderCircle, Search, X } from "lucide-react";
 import { Dialog, DialogDescription, DialogHeader, DialogTitle, DrawerContent } from "@/components/ui/dialog";
@@ -93,9 +93,9 @@ export function ReturnsListing() {
     {error ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
     <div className="mt-5 flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1.5 shadow-card">{tab("", "All", allCount)}{TABS.map((value) => tab(value, RETURN_STATUS_LABEL[value], counts[value] ?? 0))}</div>
     <div className="mt-3 flex flex-wrap items-end gap-2.5 rounded-xl border border-border bg-surface p-3 shadow-card">
-      <label className="relative min-w-[240px] flex-1"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" /><input value={filters.q} onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))} placeholder="Return number, order number, product, customer name or email" className={`${fieldClass} w-full pl-8`} /></label>
-      <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">From<DatePicker type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(value) => { setFilters((current) => ({ ...current, dateFrom: value })); setPage(1); }} className={`${fieldClass} mt-1 block`} /></label>
-      <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">To<DatePicker type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(value) => { setFilters((current) => ({ ...current, dateTo: value })); setPage(1); }} className={`${fieldClass} mt-1 block`} /></label>
+      <label className="relative min-w-[240px] max-w-160 flex-1"><span className="sr-only">Search</span><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" /><input value={filters.q} onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))} placeholder="Return number, order number, product, customer name or email" className={`${fieldClass} w-full pl-8`} /></label>
+      <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">From<DatePicker type="date" value={filters.dateFrom} max={filters.dateTo || undefined} onChange={(value) => { setFilters((current) => ({ ...current, dateFrom: value })); setPage(1); }} className={`${fieldClass} mt-1 w-36`} /></label>
+      <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">To<DatePicker type="date" value={filters.dateTo} min={filters.dateFrom || undefined} onChange={(value) => { setFilters((current) => ({ ...current, dateTo: value })); setPage(1); }} className={`${fieldClass} mt-1 w-36`} /></label>
       {filtered ? <button type="button" onClick={() => { setFilters(emptyFilters); setSearch(""); setPage(1); }} className="inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-[13px] font-semibold text-ink-secondary hover:bg-neutral-tint"><X className="h-4 w-4" />Clear</button> : null}
     </div>
     <section className="mt-3 overflow-hidden rounded-xl border border-border bg-surface shadow-card"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead className="bg-canvas text-[10.5px] uppercase tracking-[0.06em] text-ink-muted"><tr><th className="px-4 py-3 font-semibold">Return</th><th className="px-4 py-3 font-semibold">Order</th><th className="px-4 py-3 font-semibold">Customer</th><th className="px-4 py-3 font-semibold">Items</th><th className="px-4 py-3 font-semibold">Requested</th><th className="px-4 py-3 text-right font-semibold">Refund</th><th className="px-4 py-3 text-center font-semibold">Status</th></tr></thead>
@@ -252,13 +252,35 @@ function InspectionForm({ item, busy, onSubmit }: { item: ReturnItem; busy: bool
   </form>;
 }
 
-/** Private images, streamed through the authenticated proxy; click opens full size. */
+/** Private images, streamed through the authenticated proxy; click opens an in-page viewer with previous/next. */
 function Photos({ returnId, ids, label, empty, upload, busy }: { returnId: number; ids: number[]; label: string; empty: string; upload?: (files: File[]) => Promise<boolean>; busy?: boolean }) {
+  const [index, setIndex] = useState<number | null>(null);
+  const viewer = useRef<HTMLDialogElement>(null);
+  const src = (imageId: number) => `/api/payments/returns/${returnId}/images/${imageId}`;
+  const open = (i: number) => { setIndex(i); viewer.current?.showModal(); };
+  const step = (by: number) => setIndex((current) => current === null ? current : Math.min(ids.length - 1, Math.max(0, current + by)));
+  const control = "fixed grid h-11 w-11 place-items-center rounded-full bg-white/90 text-ink shadow-card disabled:cursor-default disabled:opacity-35";
   return <div className="mt-2"><p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">{label}</p><div className="mt-1.5 flex flex-wrap gap-2">
-    {ids.map((imageId) => { const src = `/api/payments/returns/${returnId}/images/${imageId}`; return <a key={imageId} href={src} target="_blank" rel="noopener noreferrer" className="block h-20 w-20 overflow-hidden rounded-md border border-border bg-canvas hover:ring-2 hover:ring-accent">
+    {ids.map((imageId, i) => <button type="button" key={imageId} onClick={() => open(i)} aria-label={`View ${label.toLowerCase()} ${i + 1} of ${ids.length}`} className="block h-20 w-20 cursor-zoom-in overflow-hidden rounded-md border border-border bg-canvas hover:ring-2 hover:ring-accent">
       {/* eslint-disable-next-line @next/next/no-img-element -- private image behind the auth proxy */}
-      <img src={src} alt={label} className="h-full w-full object-cover" /></a>; })}
+      <img src={src(imageId)} alt="" className="h-full w-full object-cover" /></button>)}
     {upload ? <label className={`flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border-strong text-[10.5px] text-ink-muted hover:bg-neutral-tint ${busy ? "pointer-events-none opacity-50" : ""}`}><ImagePlus className="h-4 w-4" />Add photos<input type="file" multiple accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length) void upload(files); }} /></label> : null}
     {!ids.length && !upload ? <span className="text-xs text-ink-muted">{empty}</span> : null}
-  </div></div>;
+  </div>
+  {/* Native modal dialog: sits above the drawer; Esc closes only this viewer, not the drawer too. */}
+  <dialog ref={viewer} aria-label={label} onClose={() => setIndex(null)}
+    onClick={(event) => { event.stopPropagation(); if (event.target === event.currentTarget) viewer.current?.close(); }}
+    onKeyDown={(event) => { event.stopPropagation(); if (event.key === "ArrowLeft") step(-1); if (event.key === "ArrowRight") step(1); }}
+    className="m-0 h-screen max-h-none w-screen max-w-none bg-transparent p-0 backdrop:bg-black/85 open:grid open:place-items-center">
+    {index !== null ? <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- private image behind the auth proxy */}
+      <img src={src(ids[index])} alt={`${label} ${index + 1} of ${ids.length}`} className="max-h-[82vh] max-w-[min(92vw,1100px)] rounded-lg bg-white object-contain" />
+      <button type="button" onClick={() => viewer.current?.close()} aria-label="Close" className={`${control} right-4 top-4`}><X className="h-5 w-5" /></button>
+      {ids.length > 1 ? <>
+        <button type="button" onClick={() => step(-1)} disabled={index === 0} aria-label="Previous photo" className={`${control} left-4 top-1/2 -translate-y-1/2`}><ChevronLeft className="h-6 w-6" /></button>
+        <button type="button" onClick={() => step(1)} disabled={index === ids.length - 1} aria-label="Next photo" className={`${control} right-4 top-1/2 -translate-y-1/2`}><ChevronRight className="h-6 w-6" /></button>
+        <p aria-live="polite" className="fixed bottom-5 left-1/2 m-0 -translate-x-1/2 text-[13px] font-semibold text-white">{label} · {index + 1} / {ids.length}</p>
+      </> : null}
+    </> : null}
+  </dialog></div>;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { SectionHeaderDialog } from "./section-header-dialog";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowDown, ArrowUp, Calculator, ExternalLink, Grid3x3, Handshake, LayoutTemplate, LoaderCircle, Package, RefreshCw, ShieldCheck, Sparkles, Zap } from "lucide-react";
@@ -23,7 +24,7 @@ const meta: Record<SectionType, { icon: typeof LayoutTemplate; description: stri
   HERO: { icon: LayoutTemplate, description: "Homepage hero carousel." },
   TRUST_STRIP: { icon: ShieldCheck, description: "Delivery, warranty and price-match trust badges." },
   DEPARTMENTS: { icon: Grid3x3, description: "Automatic — top-level category tiles." },
-  FEATURED_PRODUCTS: { icon: Sparkles, description: "Automatic — products flagged as featured." },
+  FEATURED_PRODUCTS: { icon: Sparkles, description: "Automatic — the four best-selling products." },
   PROJECT_KITS: { icon: Package, description: "Turnkey project material bundles." },
   TRADE_CTA: { icon: Handshake, description: "Trade account signup banner." },
   CALCULATORS: { icon: Calculator, description: "Jobsite material calculators." },
@@ -31,10 +32,10 @@ const meta: Record<SectionType, { icon: typeof LayoutTemplate; description: stri
 };
 // Where each section's actual content is authored, for the types that have
 // one - this panel only controls order/visibility, never the content itself.
-const contentLink: Partial<Record<SectionType, string>> = { HERO: "/merchandising", TRUST_STRIP: "/merchandising", DEPARTMENTS: "/categories", FEATURED_PRODUCTS: "/products", PROJECT_KITS: "/homepage/project-kits" };
+const contentLink: Partial<Record<SectionType, string>> = { HERO: "/merchandising", TRUST_STRIP: "/merchandising", PROJECT_KITS: "/homepage/project-kits" };
 // Section types with an in-panel content editor (via `config`), rather than a
 // deep-link to another page.
-const configEditableTypes = ["TRADE_CTA", "CALCULATORS", "ECOSYSTEM_MATCHER"] as const;
+const configEditableTypes = ["DEPARTMENTS", "FEATURED_PRODUCTS", "TRADE_CTA", "CALCULATORS", "ECOSYSTEM_MATCHER"] as const;
 type ConfigEditableType = (typeof configEditableTypes)[number];
 
 export function HomepageListing() {
@@ -62,7 +63,7 @@ export function HomepageListing() {
   {error ? <div role="alert" className="mb-4 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
   <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
     <div className="min-w-0 xl:w-[380px] xl:shrink-0">
-      <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Homepage</h1><p className="mt-1 text-[13.5px] text-ink-muted">Show or hide homepage sections without a deployment. Layout and order are fixed on the storefront.</p>
+      <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Homepage</h1><p className="mt-1 text-[13.5px] text-ink-muted">Show, hide and reorder homepage sections without a deployment; the storefront follows this order.</p>
       <div className="mt-5">{loading ? <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-ink-muted" /></div> : <div className="space-y-2.5">{items.map((section, index) => {
       const Icon = meta[section.type].icon;
       const link = contentLink[section.type];
@@ -85,6 +86,7 @@ export function HomepageListing() {
       <iframe key={previewKey} src={STOREFRONT_URL} title="Storefront live preview" className="h-[80vh] w-full border-0 bg-canvas" />
     </div></div>
   </div>
+  {editingSection?.type === "DEPARTMENTS" || editingSection?.type === "FEATURED_PRODUCTS" ? <SectionHeaderDialog type={editingSection.type} sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "TRADE_CTA" ? <TradeCtaDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "CALCULATORS" ? <CalculatorsDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "ECOSYSTEM_MATCHER" ? <EcosystemMatcherDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
