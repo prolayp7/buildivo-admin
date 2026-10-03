@@ -26,6 +26,10 @@ export function youTubeId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+function isUploadedVideoUrl(url: string) {
+  return /^\/uploads\/[\w./%-]+\.(?:mp4|webm)(?:[?#].*)?$/i.test(url);
+}
+
 const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const plainText = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").trim();
 
@@ -41,12 +45,13 @@ export function blocksToHtml(blocks: ContentBlock[]): string {
     const caption = block.caption.trim() ? `<figcaption>${escapeHtml(block.caption.trim())}</figcaption>` : "";
     if (block.type === "image") return block.url ? `<figure><img src="${escapeHtml(block.url)}" alt="${escapeHtml(block.alt.trim())}" loading="lazy" />${caption}</figure>` : "";
     const id = youTubeId(block.url);
-    return id ? `<figure class="video"><iframe src="https://www.youtube-nocookie.com/embed/${id}" title="${escapeHtml(block.caption.trim() || "YouTube video")}" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>${caption}</figure>` : "";
+    if (id) return `<figure class="video"><iframe src="https://www.youtube-nocookie.com/embed/${id}" title="${escapeHtml(block.caption.trim() || "YouTube video")}" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>${caption}</figure>`;
+    return isUploadedVideoUrl(block.url) ? `<figure class="video"><video src="${escapeHtml(block.url)}" controls preload="metadata" playsinline></video>${caption}</figure>` : "";
   }).filter(Boolean).join("\n");
 }
 
 export function hasContent(blocks: ContentBlock[]) {
-  return blocks.some((block) => block.type === "text" ? plainText(block.html).length > 0 || Boolean(block.heading?.trim()) : block.type === "image" ? Boolean(block.url) : Boolean(youTubeId(block.url)));
+  return blocks.some((block) => block.type === "text" ? plainText(block.html).length > 0 || Boolean(block.heading?.trim()) : block.type === "image" ? Boolean(block.url) : Boolean(youTubeId(block.url) || isUploadedVideoUrl(block.url)));
 }
 
 // Posts created before blocks existed only have `content` HTML - show it as one text block.
@@ -146,12 +151,43 @@ function ImageEditor({ block, onChange, collection }: { block: ImageBlock; onCha
 }
 
 function VideoEditor({ block, onChange }: { block: VideoBlock; onChange: (patch: Partial<VideoBlock>) => void }) {
-  const id = youTubeId(block.url);
+  const [uploading, setUploading] = useState(false), [error, setError] = useState("");
+  const uploadedVideo = isUploadedVideoUrl(block.url);
+  const id = youTubeId(uploadedVideo ? "" : block.url);
+
+  async function upload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["video/mp4", "video/webm"].includes(file.type)) { setError("Choose an MP4 or WebM video."); return; }
+    if (file.size > 25 * 1024 * 1024) { setError("Videos must be 25 MB or smaller."); return; }
+    setUploading(true); setError("");
+    try {
+      const body = new FormData();
+      body.set("file", file); body.set("ownerType", "LIBRARY"); body.set("ownerId", "0"); body.set("collection", "blog-video"); body.set("altText", block.caption.trim() || "Blog video");
+      const response = await fetch("/api/media", { method: "POST", body });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof payload?.message === "string" ? payload.message : "The video could not be uploaded.");
+      const uploaded = payload.data ?? payload;
+      if (typeof uploaded.url !== "string") throw new Error("The video upload did not return a media URL.");
+      onChange({ url: uploaded.url });
+    } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "The video could not be uploaded."); } finally { setUploading(false); }
+  }
+
   return (
     <div className="space-y-3">
-      <label className={labelClass}>YouTube link<input value={block.url} onChange={(event) => onChange({ url: event.target.value })} placeholder="https://www.youtube.com/watch?v=…" className={inputClass} /></label>
-      {block.url.trim() && !id ? <p role="alert" className="text-xs text-danger-tint-ink">That doesn&apos;t look like a YouTube link. Use a watch, youtu.be, shorts or embed URL.</p> : null}
+      <label className={labelClass}>YouTube link<input value={uploadedVideo ? "" : block.url} onChange={(event) => onChange({ url: event.target.value })} placeholder="https://www.youtube.com/watch?v=…" className={inputClass} /></label>
+      {block.url.trim() && !id && !uploadedVideo ? <p role="alert" className="text-xs text-danger-tint-ink">That doesn&apos;t look like a YouTube link. Use a watch, youtu.be, shorts or embed URL.</p> : null}
       {id ? <div className="aspect-video w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-ink"><iframe src={`https://www.youtube-nocookie.com/embed/${id}`} title="YouTube preview" allow="encrypted-media; picture-in-picture" allowFullScreen loading="lazy" className="h-full w-full" /></div> : null}
+      {uploadedVideo ? <><div className="aspect-video w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-ink"><video src={mediaFileUrl(block.url)} controls preload="metadata" playsInline className="h-full w-full" /></div><button type="button" onClick={() => onChange({ url: "" })} className="text-xs font-semibold text-ink-secondary underline underline-offset-2 hover:text-ink">Remove uploaded video</button></> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-surface px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">
+          {uploading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}Upload video
+          <input type="file" accept="video/mp4,video/webm" onChange={(event) => void upload(event)} disabled={uploading} className="sr-only" />
+        </label>
+        <span className="text-xs text-ink-muted">MP4 or WebM, up to 25 MB</span>
+      </div>
+      {error ? <p role="alert" className="text-xs text-danger-tint-ink">{error}</p> : null}
       <label className={labelClass}>Caption (optional)<input value={block.caption} onChange={(event) => onChange({ caption: event.target.value })} placeholder="Shown under the video" className={inputClass} /></label>
     </div>
   );
