@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 
-export type ProductCreationType = "standard" | "variants";
+export type ProductCreationType = "standard" | "variants" | "bundle";
 
 const options = [
   { type: "standard" as const, title: "Standard product", description: "A single physical item with one stock and price setup.", icon: Package, available: true },
   { type: "variants" as const, title: "Product with variants", description: "One product offered in configurations such as RAM, storage or colour.", icon: Layers3, available: true },
-  { type: null, title: "Bundle or kit", description: "A sellable pack made from multiple catalogue products.", icon: Boxes, available: false },
+  { type: "bundle" as const, title: "Bundle or kit", description: "Create a sellable set from existing product variants.", icon: Boxes, available: true },
   { type: null, title: "Digital product", description: "Software licences, downloads or other non-shipped items.", icon: FileDown, available: false },
 ];
 

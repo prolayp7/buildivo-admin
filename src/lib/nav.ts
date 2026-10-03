@@ -35,6 +35,7 @@ import {
   MessageCircleQuestion,
   ScrollText,
   PanelBottom,
+  Building2,
 } from "lucide-react";
 
 export type NavItem = {
@@ -78,6 +79,7 @@ export const navGroups: NavGroup[] = [
       { label: "Stock", href: "/stock", icon: Boxes },
       { label: "Categories", href: "/categories", icon: FolderTree },
       { label: "Brands", href: "/brands", icon: Tag },
+      { label: "Suppliers", href: "/suppliers", icon: Building2 },
       { label: "Attributes", href: "/attributes", icon: ListPlus },
       { label: "Tax rates", href: "/tax-rates", icon: Percent },
     ],

@@ -1,7 +1,7 @@
 "use client";
 
 import { CURRENCY } from "@/lib/currency";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Ban,
@@ -70,6 +70,7 @@ type OrderDetail = Order & {
   adminNote?: string | null;
   trackingCarrier?: string | null;
   trackingNumber?: string | null;
+  trackingUrl?: string | null;
   shippingMethod?: { title: string; carrier: string } | null;
   items: Array<{ id: number; titleSnapshot: string; variantTitleSnapshot: string; skuSnapshot?: string | null; quantity: number; unitPrice: string; subtotal: string; product?: { category?: { title: string } | null } | null }>;
   statusHistory: Array<{ id: number; fromStatus: OrderStatus | null; toStatus: OrderStatus; note: string | null; changedByAdmin: { name: string } | null; createdAt: string }>;
@@ -278,9 +279,44 @@ export function OrdersPage({ initialSearch = "", initialOpenId = null, initialPa
 export function OrderDrawer({ id, onClose, onStatus }: { id: number; onClose: () => void; onStatus: (status: OrderStatus) => void }) {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
+  const [trackingCarrier, setTrackingCarrier] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
+  const [trackingSaving, setTrackingSaving] = useState(false);
+  const [trackingError, setTrackingError] = useState("");
+  const [trackingNotice, setTrackingNotice] = useState("");
+  const syncTracking = useCallback((detail: OrderDetail) => {
+    setTrackingCarrier(detail.trackingCarrier ?? "");
+    setTrackingNumber(detail.trackingNumber ?? "");
+    setTrackingUrl(detail.trackingUrl ?? "");
+  }, []);
   const reload = async () => { const response = await fetch(`/api/orders/${id}`, { cache: "no-store" }); if (response.ok) setOrder(unwrap<OrderDetail>(await response.json())); };
-  useEffect(() => { const timer = window.setTimeout(async () => { try { const response = await fetch(`/api/orders/${id}`); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Order details could not be loaded.")); setOrder(unwrap<OrderDetail>(payload)); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Order details could not be loaded."); } }, 0); return () => window.clearTimeout(timer); }, [id]);
+  useEffect(() => { const timer = window.setTimeout(async () => { try { const response = await fetch(`/api/orders/${id}`, { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Order details could not be loaded.")); const detail = unwrap<OrderDetail>(payload); setOrder(detail); syncTracking(detail); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Order details could not be loaded."); } }, 0); return () => window.clearTimeout(timer); }, [id, syncTracking]);
   useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); }; document.addEventListener("keydown", close); return () => document.removeEventListener("keydown", close); }, [onClose]);
+
+  async function saveTracking(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTrackingSaving(true);
+    setTrackingError("");
+    setTrackingNotice("");
+    try {
+      const response = await fetch(`/api/orders/${id}/tracking`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackingCarrier: trackingCarrier.trim(), trackingNumber: trackingNumber.trim(), trackingUrl: trackingUrl.trim() || null }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(message(payload, "Tracking details could not be saved."));
+      const detail = unwrap<OrderDetail>(payload);
+      setOrder(detail);
+      syncTracking(detail);
+      setTrackingNotice("Tracking details saved. Customers can view them from Track order.");
+    } catch (saveError) {
+      setTrackingError(saveError instanceof Error ? saveError.message : "Tracking details could not be saved.");
+    } finally {
+      setTrackingSaving(false);
+    }
+  }
 
   const totalItems = order?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   const deliveredEntry = order?.statusHistory.find((entry) => entry.toStatus === "DELIVERED");
@@ -320,7 +356,18 @@ export function OrderDrawer({ id, onClose, onStatus }: { id: number; onClose: ()
 
           <section><h3 className="text-[13px] font-semibold text-ink">Order Tracking</h3><div className="mt-3">{order.statusHistory.map((entry, index) => { const current = index === order.statusHistory.length - 1; return <div key={entry.id} className="relative flex gap-3 pb-6 last:pb-0">{index < order.statusHistory.length - 1 ? <span className="absolute left-[11px] top-6 bottom-0 w-px bg-border" /> : null}<span className={cn("z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full", current ? "bg-positive text-white" : "bg-neutral-tint text-ink-muted")}>{current ? <Check className="h-3.5 w-3.5" /> : <span className="h-2 w-2 rounded-full bg-current" />}</span><div className="flex-1 pt-0.5"><div className="flex items-baseline justify-between gap-3"><p className="text-xs font-semibold text-ink">{label(entry.toStatus)}</p><p className="shrink-0 text-[10.5px] text-ink-muted">{new Date(entry.createdAt).toLocaleDateString("en-GB")}, {new Date(entry.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</p></div><p className="mt-0.5 text-[11px] text-ink-muted">{entry.changedByAdmin ? `Changed by ${entry.changedByAdmin.name}` : "Automatic update"}{entry.note ? ` · ${entry.note}` : ""}</p></div></div>; })}{!order.statusHistory.length ? <p className="text-xs text-ink-muted">No status history yet.</p> : null}</div></section>
 
-          {order.trackingNumber ? <section><h3 className="text-[13px] font-semibold text-ink">Tracking</h3><p className="mt-2 font-mono text-xs text-ink-secondary">{order.trackingCarrier || "Carrier"} · {order.trackingNumber}</p></section> : null}
+          <section>
+            <h3 className="text-[13px] font-semibold text-ink">Customer delivery tracking</h3>
+            <p className="mt-1 text-xs text-ink-muted">Enter the carrier and tracking ID after dispatch. Carrier API credentials are not required.</p>
+            <form onSubmit={(event) => void saveTracking(event)} className="mt-3 grid gap-3 rounded-lg border border-border bg-canvas p-4 md:grid-cols-2">
+              <label className="text-xs font-semibold text-ink-secondary">Carrier<input required maxLength={255} value={trackingCarrier} onChange={(event) => setTrackingCarrier(event.target.value)} placeholder="e.g. Royal Mail" className="mt-1 h-9 w-full rounded-md border border-border-strong bg-surface px-3 text-xs font-normal text-ink outline-none focus:border-accent-strong" /></label>
+              <label className="text-xs font-semibold text-ink-secondary">Tracking ID<input required maxLength={255} value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="Enter the shipment tracking number" className="mt-1 h-9 w-full rounded-md border border-border-strong bg-surface px-3 font-mono text-xs font-normal text-ink outline-none focus:border-accent-strong" /></label>
+              <label className="text-xs font-semibold text-ink-secondary md:col-span-2">Tracking URL <span className="font-normal text-ink-muted">(optional)</span><input type="url" value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} placeholder="https://carrier.example/track/…" className="mt-1 h-9 w-full rounded-md border border-border-strong bg-surface px-3 text-xs font-normal text-ink outline-none focus:border-accent-strong" /></label>
+              {trackingError ? <p role="alert" className="text-xs text-danger-tint-ink md:col-span-2">{trackingError}</p> : null}
+              {trackingNotice ? <p role="status" className="text-xs text-positive-tint-ink md:col-span-2">{trackingNotice}</p> : null}
+              <div className="md:col-span-2"><button type="submit" disabled={trackingSaving} className="inline-flex h-9 items-center gap-2 rounded-md bg-ink px-4 text-xs font-semibold text-white disabled:opacity-50">{trackingSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}{order.trackingNumber ? "Save tracking details" : "Add tracking details"}</button></div>
+            </form>
+          </section>
         </div>}
       </div>
     </div>

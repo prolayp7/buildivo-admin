@@ -8,6 +8,16 @@ import { mediaFileUrl, type MediaItem } from "@/lib/media";
 type GeneralSettings = {
   brandName: string;
   aboutText: string;
+  topBarTradeMessage: string;
+  topBarMobileTradeLabel: string;
+  topBarHelpCenterLabel: string;
+  topBarHelpCenterUrl: string;
+  topBarTrackOrderLabel: string;
+  topBarTrackOrderUrl: string;
+  topBarBranchFinderLabel: string;
+  topBarBranchFinderUrl: string;
+  topBarTradePortalLabel: string;
+  topBarTradePortalUrl: string;
   logo: string;
   favicon: string;
   companyAddress: string;
@@ -46,7 +56,9 @@ type GeneralSettings = {
 };
 
 const emptySettings: GeneralSettings = {
-  brandName: "", aboutText: "", logo: "", favicon: "", companyAddress: "", supportPhone1: "", supportPhone2: "", supportEmail: "",
+  brandName: "", aboutText: "", topBarTradeMessage: "Trade accounts save up to 15%", topBarMobileTradeLabel: "Pro Net 30", topBarHelpCenterLabel: "Help Center", topBarHelpCenterUrl: "/help",
+  topBarTrackOrderLabel: "Track Order", topBarTrackOrderUrl: "/track-order", topBarBranchFinderLabel: "Branch Finder", topBarBranchFinderUrl: "/branches", topBarTradePortalLabel: "Trade Portal Net 30", topBarTradePortalUrl: "/trade",
+  logo: "", favicon: "", companyAddress: "", supportPhone1: "", supportPhone2: "", supportEmail: "",
   socialFacebook: "", socialInstagram: "", socialTwitter: "", socialYoutube: "",
   latitude: "", longitude: "", copyright: "", vatNumber: "", openingHours: "", newsletterFromEmail: "",
   metaTitle: "", metaKeywords: "", metaDescription: "", googleSiteVerification: "", bingSiteVerification: "",
@@ -129,6 +141,22 @@ export function GeneralSettingsTab() {
           <label className={`${labelClass} md:col-span-2`}>About text<textarea value={settings.aboutText} onChange={(event) => set("aboutText", event.target.value)} rows={3} maxLength={300} placeholder="A short description shown in the storefront footer &quot;About&quot; section." className={`${inputClass} h-auto py-2`} /></label>
           <ImageField label="Logo" hint="Recommended: wide transparent PNG or WebP, around 200×40px. JPG, PNG or WebP, up to 1MB." value={settings.logo} onChange={(url) => set("logo", url)} collection="general-logo" altText="Logo" />
           <ImageField label="Favicon" hint="Recommended: square PNG or WebP, at least 64×64px. Up to 1MB." value={settings.favicon} onChange={(url) => set("favicon", url)} collection="general-favicon" altText="Favicon" square />
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+        <header className="border-b border-border px-5 py-4"><h2 className="text-[14px] font-semibold text-ink">Storefront top bar</h2><p className="mt-1 text-xs text-ink-muted">Edit the promotional message and shortcut labels/links shown in the desktop utility bar and mobile promo strip. Leave a label blank to hide that shortcut.</p></header>
+        <div className="grid gap-4 p-5 md:grid-cols-2">
+          <label className={labelClass}>Trade promotion message<input value={settings.topBarTradeMessage} onChange={(event) => set("topBarTradeMessage", event.target.value)} maxLength={100} placeholder="Trade accounts save up to 15%" className={inputClass} /></label>
+          <label className={labelClass}>Mobile trade link label<input value={settings.topBarMobileTradeLabel} onChange={(event) => set("topBarMobileTradeLabel", event.target.value)} maxLength={32} placeholder="Pro Net 30" className={inputClass} /></label>
+          <label className={labelClass}>Help Center label<input value={settings.topBarHelpCenterLabel} onChange={(event) => set("topBarHelpCenterLabel", event.target.value)} maxLength={40} placeholder="Help Center" className={inputClass} /></label>
+          <label className={labelClass}>Help Center destination<input value={settings.topBarHelpCenterUrl} onChange={(event) => set("topBarHelpCenterUrl", event.target.value)} maxLength={500} placeholder="/help or https://example.com/help" className={inputClass} /></label>
+          <label className={labelClass}>Track Order label<input value={settings.topBarTrackOrderLabel} onChange={(event) => set("topBarTrackOrderLabel", event.target.value)} maxLength={40} placeholder="Track Order" className={inputClass} /></label>
+          <label className={labelClass}>Track Order destination<input value={settings.topBarTrackOrderUrl} onChange={(event) => set("topBarTrackOrderUrl", event.target.value)} maxLength={500} placeholder="/track-order" className={inputClass} /></label>
+          <label className={labelClass}>Branch Finder label<input value={settings.topBarBranchFinderLabel} onChange={(event) => set("topBarBranchFinderLabel", event.target.value)} maxLength={40} placeholder="Branch Finder" className={inputClass} /></label>
+          <label className={labelClass}>Branch Finder destination<input value={settings.topBarBranchFinderUrl} onChange={(event) => set("topBarBranchFinderUrl", event.target.value)} maxLength={500} placeholder="/branches" className={inputClass} /></label>
+          <label className={labelClass}>Trade Portal label<input value={settings.topBarTradePortalLabel} onChange={(event) => set("topBarTradePortalLabel", event.target.value)} maxLength={40} placeholder="Trade Portal Net 30" className={inputClass} /></label>
+          <label className={labelClass}>Trade Portal destination<input value={settings.topBarTradePortalUrl} onChange={(event) => set("topBarTradePortalUrl", event.target.value)} maxLength={500} placeholder="/trade" className={inputClass} /></label>
         </div>
       </section>
 

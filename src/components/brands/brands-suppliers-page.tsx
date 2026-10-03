@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Building2, ChevronLeft, ChevronRight, LoaderCircle, MoreHorizontal, PackageCheck, Pencil, Plus, Search, Tag } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -14,7 +14,8 @@ type Item = { id: number; title: string; slug: string; status: "ACTIVE" | "INACT
 
 export function BrandsSuppliersPage() {
 	const params = useSearchParams();
-	const tab = params.get("tab") === "suppliers" ? "suppliers" : "brands";
+	const pathname = usePathname();
+	const tab = pathname === "/suppliers" || params.get("tab") === "suppliers" ? "suppliers" : "brands";
 	const [items, setItems] = useState<Item[]>([]);
 	const [meta, setMeta] = useState<Meta | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -64,7 +65,7 @@ export function BrandsSuppliersPage() {
 			<div className="flex items-start justify-between">
 				<div>
 					<p className="text-xs text-ink-muted">Catalog</p>
-					<h1 className="mt-2 text-[22px] font-semibold text-ink">Brands &amp; suppliers</h1>
+					<h1 className="mt-2 text-[22px] font-semibold text-ink">{tab === "suppliers" ? "Suppliers" : "Brands & suppliers"}</h1>
 					<p className="mt-1 text-[13.5px] text-ink-muted">Manage manufacturers and the companies that supply your catalogue.</p>
 				</div>
 				<Link href={tab === "brands" ? "/brands/new" : "/suppliers/new"} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-[13px] font-semibold text-white">
@@ -73,7 +74,7 @@ export function BrandsSuppliersPage() {
 			</div>
 			<div className="mt-5 flex border-b border-border">
 				<Link href="/brands" className={`px-4 py-3 text-xs font-semibold ${tab === "brands" ? "border-b-2 border-ink text-ink" : "text-ink-muted"}`}>Brands</Link>
-				<Link href="/brands?tab=suppliers" className={`px-4 py-3 text-xs font-semibold ${tab === "suppliers" ? "border-b-2 border-ink text-ink" : "text-ink-muted"}`}>Suppliers</Link>
+				<Link href="/suppliers" className={`px-4 py-3 text-xs font-semibold ${tab === "suppliers" ? "border-b-2 border-ink text-ink" : "text-ink-muted"}`}>Suppliers</Link>
 			</div>
 			<div className="mt-4 grid gap-3 sm:grid-cols-3">
 				<Metric icon={tab === "brands" ? Tag : Building2} label={`Total ${tab}`} value={summary?.total ?? 0} />
