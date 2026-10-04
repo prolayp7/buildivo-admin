@@ -1,9 +1,13 @@
 export const ACCESS_TOKEN_COOKIE = "ukshop_admin_access";
-export const REFRESH_TOKEN_COOKIE = "ukshop_admin_refresh";
+export const REFRESH_TOKEN_COOKIE = "buildivo_admin_refresh";
+
+const secureCookies = process.env.BUILDIVO_ADMIN_COOKIE_SECURE === "false"
+  ? false
+  : process.env.NODE_ENV === "production";
 
 export const authCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
+  secure: secureCookies,
   sameSite: "lax" as const,
   path: "/",
 };
