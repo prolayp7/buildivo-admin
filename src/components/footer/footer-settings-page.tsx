@@ -110,7 +110,7 @@ export function FooterSettingsPage() {
                 </>)} />
             </Section>
 
-          <Section title="Link columns" description="The columns of links (Departments, Trade & Wholesale, Customer Support, Guides & Tools) come from your footer menu.">
+          <Section title="Link columns" description="The columns of links (Departments, Customer Support, Guides & Tools) come from your footer menu.">
               <Link href="/menus" className="inline-flex h-9 items-center gap-2 rounded-md border border-border-strong bg-surface px-3 text-xs font-semibold text-ink-secondary hover:border-ink hover:text-ink">Edit the footer menu<ExternalLink className="h-3.5 w-3.5" /></Link>
             </Section>
 

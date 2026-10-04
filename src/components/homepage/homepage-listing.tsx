@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowDown, ArrowUp, Calculator, ExternalLink, Grid3x3, Handshake, LayoutTemplate, LoaderCircle, Package, RefreshCw, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { collectionFromApi } from "@/lib/api-response";
-import { TradeCtaDialog } from "./trade-cta-dialog";
 import { CalculatorsDialog } from "./calculators-dialog";
 import { EcosystemMatcherDialog } from "./ecosystem-matcher-dialog";
 
@@ -43,6 +42,7 @@ export function HomepageListing() {
   const [saving, setSaving] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [editingSection, setEditingSection] = useState<{ type: ConfigEditableType; section: Section } | null>(null);
+  const visibleItems = items.filter((section) => section.type !== "TRADE_CTA");
 
   const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/homepage-sections", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(apiMessage(payload, "Homepage sections could not be loaded.")); setItems(collectionFromApi<Section>(payload)); setPreviewKey((key) => key + 1); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Homepage sections could not be loaded."); } finally { setLoading(false); } }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
@@ -50,10 +50,13 @@ export function HomepageListing() {
   async function toggleVisible(section: Section) { setError(""); try { const response = await fetch(`/api/homepage-sections/${section.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isVisible: !section.isVisible }) }); if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Section could not be updated.")); await load(); } catch (toggleError) { setError(toggleError instanceof Error ? toggleError.message : "Section could not be updated."); } }
 
   async function move(index: number, direction: -1 | 1) {
+    const visibleIndexes = items.flatMap((item, itemIndex) => item.type === "TRADE_CTA" ? [] : [itemIndex]);
     const target = index + direction;
-    if (target < 0 || target >= items.length) return;
+    if (target < 0 || target >= visibleIndexes.length) return;
+    const visible = visibleIndexes.map((itemIndex) => items[itemIndex]);
+    [visible[index], visible[target]] = [visible[target], visible[index]];
     const next = [...items];
-    [next[index], next[target]] = [next[target], next[index]];
+    visibleIndexes.forEach((itemIndex, visibleIndex) => { next[itemIndex] = visible[visibleIndex]; });
     setItems(next);
     setSaving(true); setError("");
     try { const response = await fetch("/api/homepage-sections/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: next.map((item) => item.id) }) }); if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Sections could not be reordered.")); await load(); } catch (moveError) { setError(moveError instanceof Error ? moveError.message : "Sections could not be reordered."); await load(); } finally { setSaving(false); }
@@ -64,12 +67,12 @@ export function HomepageListing() {
   <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
     <div className="min-w-0 xl:w-[380px] xl:shrink-0">
       <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Homepage</h1><p className="mt-1 text-[13.5px] text-ink-muted">Show, hide and reorder homepage sections without a deployment; the storefront follows this order.</p>
-      <div className="mt-5">{loading ? <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-ink-muted" /></div> : <div className="space-y-2.5">{items.map((section, index) => {
+      <div className="mt-5">{loading ? <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-ink-muted" /></div> : <div className="space-y-2.5">{visibleItems.map((section, index) => {
       const Icon = meta[section.type].icon;
       const link = contentLink[section.type];
       return <div key={section.id} className="rounded-xl border border-border bg-surface p-3.5 shadow-card">
         <div className="flex items-start gap-2.5">
-          <div className="flex shrink-0 flex-col gap-0.5"><button type="button" onClick={() => void move(index, -1)} disabled={saving || index === 0} aria-label="Move up" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void move(index, 1)} disabled={saving || index === items.length - 1} aria-label="Move down" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button></div>
+          <div className="flex shrink-0 flex-col gap-0.5"><button type="button" onClick={() => void move(index, -1)} disabled={saving || index === 0} aria-label="Move up" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void move(index, 1)} disabled={saving || index === visibleItems.length - 1} aria-label="Move down" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button></div>
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-canvas text-[11px] font-semibold text-ink-secondary">{index + 1}</span>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-tint text-ink-muted"><Icon className="h-4 w-4" /></span>
           <div className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-ink">{section.label}</p><p className="mt-0.5 text-xs text-ink-muted">{meta[section.type].description}</p></div>
@@ -87,7 +90,6 @@ export function HomepageListing() {
     </div></div>
   </div>
   {editingSection?.type === "DEPARTMENTS" || editingSection?.type === "FEATURED_PRODUCTS" ? <SectionHeaderDialog type={editingSection.type} sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
-  {editingSection?.type === "TRADE_CTA" ? <TradeCtaDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "CALCULATORS" ? <CalculatorsDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   {editingSection?.type === "ECOSYSTEM_MATCHER" ? <EcosystemMatcherDialog sectionId={editingSection.section.id} initialConfig={editingSection.section.config} onClose={() => setEditingSection(null)} onSaved={load} /> : null}
   </div>;

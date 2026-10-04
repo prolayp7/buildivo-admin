@@ -147,16 +147,12 @@ export function GeneralSettingsTab() {
       <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
         <header className="border-b border-border px-5 py-4"><h2 className="text-[14px] font-semibold text-ink">Storefront top bar</h2><p className="mt-1 text-xs text-ink-muted">Edit the promotional message and shortcut labels/links shown in the desktop utility bar and mobile promo strip. Leave a label blank to hide that shortcut.</p></header>
         <div className="grid gap-4 p-5 md:grid-cols-2">
-          <label className={labelClass}>Trade promotion message<input value={settings.topBarTradeMessage} onChange={(event) => set("topBarTradeMessage", event.target.value)} maxLength={100} placeholder="Trade accounts save up to 15%" className={inputClass} /></label>
-          <label className={labelClass}>Mobile trade link label<input value={settings.topBarMobileTradeLabel} onChange={(event) => set("topBarMobileTradeLabel", event.target.value)} maxLength={32} placeholder="Pro Net 30" className={inputClass} /></label>
           <label className={labelClass}>Help Center label<input value={settings.topBarHelpCenterLabel} onChange={(event) => set("topBarHelpCenterLabel", event.target.value)} maxLength={40} placeholder="Help Center" className={inputClass} /></label>
           <label className={labelClass}>Help Center destination<input value={settings.topBarHelpCenterUrl} onChange={(event) => set("topBarHelpCenterUrl", event.target.value)} maxLength={500} placeholder="/help or https://example.com/help" className={inputClass} /></label>
           <label className={labelClass}>Track Order label<input value={settings.topBarTrackOrderLabel} onChange={(event) => set("topBarTrackOrderLabel", event.target.value)} maxLength={40} placeholder="Track Order" className={inputClass} /></label>
           <label className={labelClass}>Track Order destination<input value={settings.topBarTrackOrderUrl} onChange={(event) => set("topBarTrackOrderUrl", event.target.value)} maxLength={500} placeholder="/track-order" className={inputClass} /></label>
           <label className={labelClass}>Branch Finder label<input value={settings.topBarBranchFinderLabel} onChange={(event) => set("topBarBranchFinderLabel", event.target.value)} maxLength={40} placeholder="Branch Finder" className={inputClass} /></label>
           <label className={labelClass}>Branch Finder destination<input value={settings.topBarBranchFinderUrl} onChange={(event) => set("topBarBranchFinderUrl", event.target.value)} maxLength={500} placeholder="/branches" className={inputClass} /></label>
-          <label className={labelClass}>Trade Portal label<input value={settings.topBarTradePortalLabel} onChange={(event) => set("topBarTradePortalLabel", event.target.value)} maxLength={40} placeholder="Trade Portal Net 30" className={inputClass} /></label>
-          <label className={labelClass}>Trade Portal destination<input value={settings.topBarTradePortalUrl} onChange={(event) => set("topBarTradePortalUrl", event.target.value)} maxLength={500} placeholder="/trade" className={inputClass} /></label>
         </div>
       </section>
 

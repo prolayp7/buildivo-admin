@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { AlertTriangle, LoaderCircle, Menu as MenuIcon, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, LoaderCircle, Menu as MenuIcon, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { IconPicker } from "@/components/ui/icon-picker";
@@ -12,12 +12,23 @@ type MenuItem = { id: number; parentId: number | null; label: string; href: stri
 type Menu = { id: number; name: string; slug: string; location: "HEADER" | "FOOTER"; status: Status; items: MenuItem[] };
 const inputClass = "mt-2 h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] font-normal text-ink outline-none placeholder:text-ink-faint focus:border-accent-strong";
 function apiMessage(payload: unknown, fallback: string) { if (payload && typeof payload === "object" && "message" in payload) { const value = (payload as { message?: unknown }).message; if (typeof value === "string") return value; if (Array.isArray(value) && typeof value[0] === "string") return value[0]; } return fallback; }
+function isTradePortalItem(item: MenuItem) {
+  let isTradePortalHref = false;
+  try {
+    isTradePortalHref = Boolean(item.href && new URL(item.href, "https://storefront.invalid").pathname.replace(/\/+$/, "").toLowerCase() === "/trade");
+  } catch {
+    isTradePortalHref = false;
+  }
+  return isTradePortalHref || /^(trade portal(?: net 30)?|trade & wholesale)$/i.test(item.label.trim());
+}
+function visibleMenuItems(items: MenuItem[]) { return items.filter((item) => !item.parentId && !isTradePortalItem(item)).flatMap((parent) => [parent, ...items.filter((item) => item.parentId === parent.id && !isTradePortalItem(item))]); }
 
 export function MenusListing() {
   const [menus, setMenus] = useState<Menu[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [itemEditing, setItemEditing] = useState<MenuItem | "new" | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MenuItem | null>(null), [deleting, setDeleting] = useState(false);
+  const [reorderingId, setReorderingId] = useState<number | null>(null);
 
   const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/menus", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(apiMessage(payload, "Menus could not be loaded.")); const list = collectionFromApi<Menu>(payload); setMenus(list); setSelectedId((current) => current && list.some((menu) => menu.id === current) ? current : (list[0]?.id ?? null)); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Menus could not be loaded."); } finally { setLoading(false); } }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
@@ -26,19 +37,48 @@ export function MenusListing() {
   // after their own children - rebuild tree order so each parent is
   // immediately followed by its children (only one level deep, see the
   // "Parent item" select below).
-  const orderedItems = selected ? selected.items.filter((item) => !item.parentId).flatMap((parent) => [parent, ...selected.items.filter((item) => item.parentId === parent.id)]) : [];
+  const orderedItems = selected ? visibleMenuItems(selected.items) : [];
 
   async function removeItem() { if (!deleteTarget || !selected) return; setDeleting(true); try { const response = await fetch(`/api/menus/${selected.id}/items/${deleteTarget.id}`, { method: "DELETE" }); if (!response.ok && response.status !== 204) throw new Error(apiMessage(await response.json().catch(() => ({})), "Menu item could not be deleted.")); setDeleteTarget(null); await load(); } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "Menu item could not be deleted."); } finally { setDeleting(false); } }
+
+  async function moveItem(item: MenuItem, direction: -1 | 1) {
+    if (!selected || selected.location !== "FOOTER" || reorderingId !== null) return;
+    const siblings = orderedItems.filter((candidate) => candidate.parentId === item.parentId);
+    const index = siblings.findIndex((candidate) => candidate.id === item.id);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= siblings.length) return;
+    const [moved] = siblings.splice(index, 1);
+    siblings.splice(nextIndex, 0, moved);
+    setReorderingId(item.id);
+    setError("");
+    try {
+      const updates = await Promise.allSettled(siblings.map(async (sibling, sortOrder) => {
+        const response = await fetch(`/api/menus/${selected.id}/items/${sibling.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sortOrder }),
+        });
+        if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Menu item order could not be saved."));
+      }));
+      await load();
+      const failedUpdate = updates.find((update) => update.status === "rejected");
+      if (failedUpdate?.status === "rejected") throw failedUpdate.reason;
+    } catch (reorderError) {
+      setError(reorderError instanceof Error ? reorderError.message : "Menu item order could not be saved.");
+    } finally {
+      setReorderingId(null);
+    }
+  }
 
   return <div className="w-full"><h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Menus</h1><p className="mt-1 text-[13.5px] text-ink-muted">Header and footer navigation.</p>
   {error ? <div role="alert" className="mt-4 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
   <div className="mt-5 grid gap-5 lg:grid-cols-[280px_1fr]">
     <div>
-      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">{loading ? <div className="p-6 text-center"><LoaderCircle className="mx-auto h-5 w-5 animate-spin text-ink-muted" /></div> : <ul className="divide-y divide-border">{menus.map((menu) => <li key={menu.id}><button type="button" onClick={() => setSelectedId(menu.id)} className={`flex w-full items-center gap-2.5 p-3.5 text-left ${selectedId === menu.id ? "bg-canvas" : "hover:bg-canvas/60"}`}><MenuIcon className="h-4 w-4 shrink-0 text-ink-muted" /><span className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-ink">{menu.name}</p><p className="mt-0.5 text-[10.5px] text-ink-muted">{menu.location} · {menu.items.length} items</p></span></button></li>)}{!menus.length ? <li className="p-6 text-center text-[13px] text-ink-muted">No menus yet.</li> : null}</ul>}</div>
+      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">{loading ? <div className="p-6 text-center"><LoaderCircle className="mx-auto h-5 w-5 animate-spin text-ink-muted" /></div> : <ul className="divide-y divide-border">{menus.map((menu) => <li key={menu.id}><button type="button" onClick={() => setSelectedId(menu.id)} className={`flex w-full items-center gap-2.5 p-3.5 text-left ${selectedId === menu.id ? "bg-canvas" : "hover:bg-canvas/60"}`}><MenuIcon className="h-4 w-4 shrink-0 text-ink-muted" /><span className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-ink">{menu.name}</p><p className="mt-0.5 text-[10.5px] text-ink-muted">{menu.location} · {visibleMenuItems(menu.items).length} items</p></span></button></li>)}{!menus.length ? <li className="p-6 text-center text-[13px] text-ink-muted">No menus yet.</li> : null}</ul>}</div>
     </div>
     <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">{!selected ? <p className="p-8 text-center text-[13px] text-ink-muted">Select or create a menu to manage its items.</p> : <>
       <div className="flex items-center justify-between border-b border-border p-4"><div><h2 className="text-[14px] font-semibold text-ink">{selected.name}</h2><p className="mt-0.5 text-xs text-ink-muted">{selected.location.toLowerCase()} navigation</p></div><button type="button" onClick={() => setItemEditing("new")} className="inline-flex h-9 items-center gap-2 rounded-md bg-ink px-3.5 text-xs font-semibold text-white hover:bg-[#1d2939]"><Plus className="h-4 w-4" />Add item</button></div>
-      <div className="divide-y divide-border">{orderedItems.map((item) => <div key={item.id} className="flex items-center gap-3 p-3.5" style={{ paddingLeft: item.parentId ? "2.5rem" : "0.875rem" }}><div className="min-w-0 flex-1"><p className="text-[13px] font-semibold text-ink">{item.label}</p><p className="mt-0.5 truncate text-xs text-ink-muted">{item.categoryId ? `Category #${item.categoryId}` : item.href ?? "—"}</p></div><span className={`inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${item.status === "ACTIVE" ? "bg-positive-tint text-positive-tint-ink" : "bg-neutral-tint text-ink-muted"}`}>{item.status}</span><button type="button" onClick={() => setItemEditing(item)} aria-label={`Edit ${item.label}`} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-neutral-tint hover:text-ink"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => setDeleteTarget(item)} aria-label={`Delete ${item.label}`} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-danger-tint hover:text-danger-tint-ink"><Trash2 className="h-4 w-4" /></button></div>)}{!selected.items.length ? <p className="p-8 text-center text-[13px] text-ink-muted">No items in this menu yet.</p> : null}</div>
+      <div className="divide-y divide-border">{orderedItems.map((item) => { const siblings = orderedItems.filter((candidate) => candidate.parentId === item.parentId); const siblingIndex = siblings.findIndex((candidate) => candidate.id === item.id); return <div key={item.id} aria-busy={reorderingId === item.id} className="flex items-center gap-3 p-3.5" style={{ paddingLeft: item.parentId ? "2.5rem" : "0.875rem" }}><div className="min-w-0 flex-1"><p className="text-[13px] font-semibold text-ink">{item.label}</p><p className="mt-0.5 truncate text-xs text-ink-muted">{item.categoryId ? `Category #${item.categoryId}` : item.href ?? "—"}</p></div><span className={`inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${item.status === "ACTIVE" ? "bg-positive-tint text-positive-tint-ink" : "bg-neutral-tint text-ink-muted"}`}>{item.status}</span>{selected.location === "FOOTER" ? <div className="flex items-center gap-1"><button type="button" onClick={() => void moveItem(item, -1)} disabled={reorderingId !== null || siblingIndex === 0} aria-label={`Move ${item.label} up`} title="Move up" className="flex h-11 w-11 items-center justify-center rounded-md text-ink-muted hover:bg-neutral-tint hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">{reorderingId === item.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ChevronUp className="h-4 w-4" />}</button><button type="button" onClick={() => void moveItem(item, 1)} disabled={reorderingId !== null || siblingIndex === siblings.length - 1} aria-label={`Move ${item.label} down`} title="Move down" className="flex h-11 w-11 items-center justify-center rounded-md text-ink-muted hover:bg-neutral-tint hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"><ChevronDown className="h-4 w-4" /></button></div> : null}<button type="button" onClick={() => setItemEditing(item)} aria-label={`Edit ${item.label}`} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-neutral-tint hover:text-ink"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => setDeleteTarget(item)} aria-label={`Delete ${item.label}`} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-danger-tint hover:text-danger-tint-ink"><Trash2 className="h-4 w-4" /></button></div>; })}{!selected.items.length ? <p className="p-8 text-center text-[13px] text-ink-muted">No items in this menu yet.</p> : null}</div>
     </>}</section>
   </div>
   {itemEditing && selected ? <ItemDialog menu={selected} item={itemEditing === "new" ? null : itemEditing} onClose={() => setItemEditing(null)} onSaved={load} /> : null}
@@ -55,7 +95,7 @@ function ItemDialog({ menu, item, onClose, onSaved }: { menu: Menu; item: MenuIt
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [parentId, setParentId] = useState(item?.parentId != null ? String(item.parentId) : "");
   const [status, setStatus] = useState<Status>(item?.status ?? "ACTIVE"), [saving, setSaving] = useState(false), [error, setError] = useState("");
-  const parentOptions = menu.items.filter((candidate) => candidate.id !== item?.id && !candidate.parentId);
+  const parentOptions = menu.items.filter((candidate) => candidate.id !== item?.id && !candidate.parentId && !isTradePortalItem(candidate));
 
   // Editing an item that already has a category: resolve its title once for
   // display, rather than loading every category up front just to label one.
