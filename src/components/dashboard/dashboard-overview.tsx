@@ -95,7 +95,7 @@ export function DashboardOverview() {
         fetch("/api/catalog/categories?page=1&perPage=100", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/products?perPage=1", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/products?status=ACTIVE&perPage=1", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
-        fetch("/api/discounts/codes?page=1&perPage=200", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+        fetch("/api/discounts/codes?page=1&perPage=100", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/orders?perPage=4", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/reviews?perPage=4", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
         fetch("/api/quotes?perPage=4", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
